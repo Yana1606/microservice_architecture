@@ -1,0 +1,2 @@
+CREATE TABLE IF NOT EXISTS public_snapshots(tournament_id TEXT PRIMARY KEY,revision INTEGER NOT NULL,json TEXT NOT NULL);
+INSERT OR IGNORE INTO schema_version VALUES(3);

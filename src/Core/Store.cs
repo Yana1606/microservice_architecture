@@ -7,6 +7,7 @@ public sealed class Store
 {
     private readonly string connectionString;
     private readonly string service;
+    public event Action<IReadOnlyList<string>>? ProjectionCommitted;
     public Store(string path, string service)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
@@ -23,6 +24,7 @@ public sealed class Store
         {
             migration.CommandText = ReadMigration("002_delivery_retry.sql"); migration.ExecuteNonQuery();
         }
+        migration.CommandText=ReadMigration("003_public_snapshots.sql");migration.ExecuteNonQuery();
         tx.Commit();
     }
     public static string Migration
@@ -74,6 +76,17 @@ public sealed class Store
             q.Parameters.Clear(); q.CommandText = "INSERT INTO outbox(id,destination,json) VALUES($id,$dest,$json)";
             q.Parameters.AddWithValue("$id", e.Id); q.Parameters.AddWithValue("$dest", destination); q.Parameters.AddWithValue("$json", Json.Write(e)); q.ExecuteNonQuery();
         }
+        var changed=new List<string>();
+        if(service is "scores" or "results")
+        {
+            foreach(var id in state.Tournaments.Keys)
+            {
+                var snapshot=Json.Write(PublicTable.Build(state,id));
+                q.Parameters.Clear();q.CommandText="SELECT json FROM public_snapshots WHERE tournament_id=$id";q.Parameters.AddWithValue("$id",id);
+                if((string?)q.ExecuteScalar()==snapshot)continue;
+                q.CommandText="INSERT INTO public_snapshots(tournament_id,revision,json) VALUES($id,1,$json) ON CONFLICT(tournament_id) DO UPDATE SET revision=revision+1,json=excluded.json";q.Parameters.AddWithValue("$json",snapshot);q.ExecuteNonQuery();changed.Add(id);
+            }
+        }
         var response = rejection == null
             ? Json.Write(new { accepted = true, tournaments = state.Tournaments.Values.Select(t => new { t.Id, t.Revision, t.Status }) })
             : Json.Write(new { accepted = false, code = rejection.Message, status = rejection.Status });
@@ -83,11 +96,24 @@ public sealed class Store
             q.Parameters.AddWithValue("$id", commandId); q.Parameters.AddWithValue("$fp", fingerprint); q.Parameters.AddWithValue("$response", response); q.ExecuteNonQuery();
         }
         tx.Commit();
+        if(changed.Count>0)ProjectionCommitted?.Invoke(changed);
         if (rejection != null) throw rejection;
         return response;
     }
+    public long PublicVersion(string id)
+    {
+        using var c=Open();using var q=c.CreateCommand();q.CommandText="SELECT revision FROM public_snapshots WHERE tournament_id=$id";q.Parameters.AddWithValue("$id",id);return (long?)q.ExecuteScalar()??0;
+    }
+    public (long Revision,string Json) PublicSnapshot(string id)
+    {
+        using var c=Open();using var q=c.CreateCommand();q.CommandText="SELECT revision,json FROM public_snapshots WHERE tournament_id=$id";q.Parameters.AddWithValue("$id",id);using var r=q.ExecuteReader();
+        return r.Read()?(r.GetInt64(0),r.GetString(1)):(0,Json.Write(new{status="WaitingForTournament",rows=Array.Empty<object>()}));
+    }
     public static string[] Routes(Event e) => e.Type switch
     {
+        "ReserveScoreboard" or "ReleaseScoreboard" => ["scores"],
+        "ReserveForms" or "ReleaseForms" => ["simulator"],
+        "ScoreboardReserved" or "ScoreboardPreparationRejected" or "ScoreboardReleased" or "FormsReserved" or "FormsPreparationRejected" or "FormsReleased" => ["tournament"],
         "TournamentStarted" or "GameStarted" or "SolutionsClosed" or "AppealsClosed" => ["scores", "results", "simulator"],
         "TournamentCreated" or "GamesConfigured" or "TournamentPublished" or "TeamRegistered" or "RegistrationRejected" or "TournamentCompleted" => ["simulator"],
         "ScoresReady" => ["results"],

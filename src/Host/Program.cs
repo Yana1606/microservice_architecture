@@ -23,6 +23,8 @@ builder.Services.AddSingleton(store);
 builder.Services.AddSingleton(new ServiceName(service));
 builder.Services.AddHttpClient("ui", client => client.Timeout = TimeSpan.FromSeconds(15));
 builder.Services.Configure<RouteHandlerOptions>(options => options.ThrowOnBadRequest = true);
+builder.Services.AddMemoryCache(options=>options.SizeLimit=2048);
+builder.Services.AddSingleton<TableSnapshotCache>();
 builder.Services.AddHostedService<DeadlineWorker>();
 builder.Services.AddHostedService<DeliveryWorker>();
 var app = builder.Build();
@@ -82,17 +84,33 @@ app.MapPost("/ui-api/fixtures/{id}/{game}", async (string id, string game, HttpR
     catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
     { return Results.Json(new { code = "simulator_unavailable" }, statusCode: 502); }
 });
+app.MapGet("/lab/status",()=>new{enabled=builder.Configuration["ENABLE_LAB_DEMOS"]=="1"});
+app.MapPost("/lab/delivery/{destination}/{action}",(string destination,string action,HttpRequest request)=>
+{
+    Require.That(builder.Configuration["ENABLE_LAB_DEMOS"]=="1","lab_disabled",404);Actor(request,"organizer");
+    Require.That(new[]{"tournament","scores","results","simulator"}.Contains(destination)&&action is "pause" or "resume","invalid_lab_command",400);
+    store.Update((s,_)=>{if(action=="pause")s.PausedDestinations.Add(destination);else s.PausedDestinations.Remove(destination);});return Results.Ok();
+});
+app.MapPost("/ui-api/lab/reject-next-forms",async(HttpRequest request,IHttpClientFactory clients)=>
+{
+    Require.That(builder.Configuration["ENABLE_LAB_DEMOS"]=="1","lab_disabled",404);Actor(request,"organizer");
+    var peer=builder.Configuration["PEER_SIMULATOR"]??"http://localhost:5104";
+    using var message=new HttpRequestMessage(HttpMethod.Post,peer+"/lab/reject-next-forms");
+    message.Headers.Authorization=new AuthenticationHeaderValue("Bearer",builder.Configuration["SIMULATOR_KEY"]??"simulator-demo");
+    using var response=await clients.CreateClient("ui").SendAsync(message,request.HttpContext.RequestAborted);
+    return Results.Content(await response.Content.ReadAsStringAsync(),"application/json",statusCode:(int)response.StatusCode);
+});
 app.MapGet("/openapi.json", () => Results.Text(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "openapi.json")), "application/json"));
 app.MapPost("/internal/events", (Event e, HttpRequest r) =>
 {
-    Require.That(e.Producer is "tournament" or "scores" or "results" or "team" or "checking", "invalid_producer", 403);
+    Require.That(e.Producer is "tournament" or "scores" or "results" or "team" or "checking" or "simulator", "invalid_producer", 403);
     Require.That(Secure(Key(e.Producer), r.Headers.Authorization.ToString().Replace("Bearer ", "", StringComparison.Ordinal)), "invalid_producer_credential", 403);
     store.Update((s, engine) => engine.Receive(s, e)); return Results.Accepted();
 });
 app.MapGet("/internal/diagnostics", (HttpRequest r) =>
 {
     Actor(r, "organizer"); var s = store.Read();
-    return Results.Ok(new { pending = s.Pending.Keys, s.Quarantine, outboxPending = store.PendingCount() });
+    return Results.Ok(new { pending = s.Pending.Keys, s.Quarantine, preparations=s.Preparations.Values,reservations=s.Reservations.Values,pausedDestinations=s.PausedDestinations, cache=app.Services.GetRequiredService<TableSnapshotCache>().Statistics,outboxPending = store.PendingCount() });
 });
 if (service == "tournament")
 {
@@ -118,7 +136,7 @@ if (service == "tournament")
         Require.That(t!.Status != "Draft" || organizer, "not_published", 404);
         if (organizer) return Results.Ok(t);
         return Results.Ok(new { t.Id, t.Name, t.Status, t.Revision, t.Starts, t.Ends, t.TeamSize, t.Regulation, t.TiePolicy,
-            Games = t.Games.Select(g => new { g.Config.Id, g.Config.Type, g.Status, g.SolutionsDue, g.AppealsDue, g.SolutionsClosed, g.AppealsClosed }),
+            Games = t.Games.Select(g => new { g.Config.Id, g.Config.Type, g.Status, g.SolutionsDue, g.AppealsDue, g.SolutionsClosed, g.AppealsClosed,g.PreparationAttemptId,g.PreparationStatus,g.PreparationFailure }),
             Teams = t.Teams.Select(x => new { x.Id, x.Name }) });
     });
     bool TryOrganizer(HttpRequest r, string owner) { try { return Actor(r, "organizer") == owner; } catch (RuleException) { return false; } }
@@ -143,7 +161,7 @@ if (service == "tournament")
 }
 if (service is "scores" or "results")
 {
-    app.MapGet("/tournaments/{id}/table", (string id) => Table(store.Read(), id));
+    app.MapGet("/tournaments/{id}/table", (string id,TableSnapshotCache cache) => Results.Text(cache.Get(id),"application/json"));
     app.MapGet("/tournaments/{id}/stream", async (string id, HttpContext context) =>
     {
         context.Response.ContentType = "text/event-stream"; context.Response.Headers.CacheControl = "no-cache";
@@ -152,7 +170,7 @@ if (service is "scores" or "results")
         {
             while (!context.RequestAborted.IsCancellationRequested)
             {
-                var current = Json.Write(Table(store.Read(), id));
+                var current = app.Services.GetRequiredService<TableSnapshotCache>().Get(id);
                 if (current != previous) { await context.Response.WriteAsync("data: " + current + "\n\n", context.RequestAborted); previous = current; }
                 else await context.Response.WriteAsync(": heartbeat\n\n", context.RequestAborted);
                 await context.Response.Body.FlushAsync(context.RequestAborted);
@@ -169,20 +187,6 @@ static string CommandId(HttpRequest r)
     var id = r.Headers["Idempotency-Key"].ToString(); Require.That(!string.IsNullOrWhiteSpace(id), "idempotency_key_required", 400); return id;
 }
 static bool Secure(string expected, string actual) => CryptographicOperations.FixedTimeEquals(SHA256.HashData(Encoding.UTF8.GetBytes(expected)), SHA256.HashData(Encoding.UTF8.GetBytes(actual)));
-static object Table(State s, string id)
-{
-    if (!s.Tournaments.TryGetValue(id, out var t)) return new { status = "WaitingForTournament", rows = Array.Empty<object>() };
-    var ranked = Engine.Rank(t.Teams.Select(team => (team.Id, (decimal)t.Games.Sum(g => s.Finals.GetValueOrDefault(State.Key(id, g.Config.Id))?.SingleOrDefault(x => x.TeamId == team.Id)?.Points ?? 0))));
-    return new { t.Id, complete = s.Winners.Contains(id), games = t.Games.Select(g => new { g.Config.Id, tasks = g.Config.Tasks.Select(x => x.Id) }),
-        rows = ranked.Select(rank => new { id = rank.TeamId, name = t.Teams.Single(x => x.Id == rank.TeamId).Name, rank.Place, total = rank.Score,
-            games = t.Games.Select(g => new { id = g.Config.Id,
-                score = s.Scores.GetValueOrDefault(State.Key(id, g.Config.Id))?.Cells[rank.TeamId].Values.Sum(x => x.Points),
-                place = s.Scores.TryGetValue(State.Key(id, g.Config.Id), out var live)
-                    ? 1 + live.Cells.Values.Count(cells => cells.Values.Sum(x => x.Points) > live.Cells[rank.TeamId].Values.Sum(x => x.Points)) : (int?)null,
-                cells = s.Scores.GetValueOrDefault(State.Key(id, g.Config.Id))?.Cells[rank.TeamId]
-                    .ToDictionary(x => x.Key, x => new { x.Value.Status, x.Value.Points }),
-                final = s.Finals.GetValueOrDefault(State.Key(id, g.Config.Id))?.SingleOrDefault(x => x.TeamId == rank.TeamId) }) }) };
-}
 record ServiceName(string Value);
 sealed class DeadlineWorker(Store store, ILogger<DeadlineWorker> log) : BackgroundService
 {

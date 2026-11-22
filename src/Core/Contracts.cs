@@ -21,6 +21,9 @@ public sealed class Game
 {
     public GameConfig Config { get; set; } = null!;
     public string Status { get; set; } = "Configured";
+    public string? PreparationAttemptId {get;set;}
+    public string? PreparationStatus {get;set;}
+    public string? PreparationFailure {get;set;}
     public DateTimeOffset? SolutionsDue { get; set; }
     public DateTimeOffset? AppealsDue { get; set; }
     public bool SolutionsClosed { get; set; }
@@ -79,6 +82,10 @@ public sealed class ScoreGame
 }
 public sealed class State
 {
+    public Dictionary<string,GamePreparation> Preparations {get;set;}=[];
+    public Dictionary<string,PreparationReservation> Reservations {get;set;}=[];
+    public HashSet<string> PausedDestinations {get;set;}=[];
+    public bool RejectNextForms {get;set;}
     public Dictionary<string, Tournament> Tournaments { get; set; } = [];
     public Dictionary<string, ScoreGame> Scores { get; set; } = [];
     public Dictionary<string, List<Standing>> Finals { get; set; } = [];

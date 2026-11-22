@@ -7,7 +7,8 @@ public sealed class DeliveryDispatcher(Store store, HttpClient http, Func<string
     // A failed recipient cannot block another recipient. Durable inboxes tolerate reordering.
     public async Task DispatchAsync(CancellationToken cancellationToken = default)
     {
-        var groups = store.Pending(DateTimeOffset.UtcNow).GroupBy(d => d.Destination);
+        var paused=store.Read().PausedDestinations;
+        var groups = store.Pending(DateTimeOffset.UtcNow).Where(d=>!paused.Contains(d.Destination)).GroupBy(d => d.Destination);
         await Task.WhenAll(groups.Select(async group =>
         {
             foreach (var delivery in group)

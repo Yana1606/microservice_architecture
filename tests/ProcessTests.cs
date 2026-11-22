@@ -11,14 +11,20 @@ public class ProcessTests
     {
         var s = new State(); var e = new Engine("tournament"); e.Create(s, NewTournament(), "o");
         void Cmd(string action, GameConfig? g = null, Team? team = null, string? game = null) => e.Command(s, "t", action, team?.Captain ?? "o", s.Tournaments["t"].Revision, g, team, game);
-        Cmd("configure", Config()); Cmd("configure", Config("g2")); Cmd("publish"); Cmd("register", team: Team("a")); Cmd("register", team: Team("b")); Cmd("start"); Cmd("start-game", game: "g1");
+        Cmd("configure", Config()); Cmd("configure", Config("g2")); Cmd("publish"); Cmd("register", team: Team("a")); Cmd("register", team: Team("b")); Cmd("start"); Cmd("start-game", game: "g1"); FinishPreparation(s,e,"g1");
         return (s, e);
+    }
+    static void FinishPreparation(State s,Engine e,string game)
+    {
+        var attempt=s.Tournaments["t"].Games.Single(x=>x.Config.Id==game).PreparationAttemptId!;
+        e.Receive(s,External("ScoreboardReserved","scores",new PreparationReply(attempt),game));
+        e.Receive(s,External("FormsReserved","simulator",new PreparationReply(attempt),game));
     }
     static Event External<T>(string type, string producer, T body, string game = "g1") => Event.Create(type, producer, "t", game, body);
     static State Scores(Engine tournament)
     {
         var state = new State(); var scores = new Engine("scores");
-        foreach (var e in tournament.Events.Where(e => e.Type is "TournamentStarted" or "GameStarted")) scores.Receive(state, e);
+        foreach (var e in tournament.Events.Where(e => e.Type is "TournamentStarted" or "ReserveScoreboard" or "GameStarted")) scores.Receive(state, e);
         return state;
     }
     static void Close(State state, Engine e)
@@ -139,7 +145,7 @@ public class ProcessTests
         var v=External("VerdictRecorded","checking",new Verdict("anon",1,"Correct","j","Jury"));
         store.Update((s,e)=>e.Receive(s,v)); Assert.Single(store.Read().Pending);
         var restarted=new Store(path,"scores");
-        restarted.Update((s,e)=>{foreach(var message in te.Events.Where(x=>x.Type is "TournamentStarted" or "GameStarted"))e.Receive(s,message);e.Receive(s,External("SolutionBound","team",new Binding("anon","a","task","normal")));});
+        restarted.Update((s,e)=>{foreach(var message in te.Events.Where(x=>x.Type is "TournamentStarted" or "ReserveScoreboard" or "GameStarted"))e.Receive(s,message);e.Receive(s,External("SolutionBound","team",new Binding("anon","a","task","normal")));});
         Assert.Empty(restarted.Read().Pending); Assert.Equal(10,restarted.Read().Scores["t/g1"].Cells["a"]["task"].Points);
         restarted.Update((s,e)=>e.Receive(s,External("VerdictRecorded","checking",new Verdict("anon",2,"AppealUpheld","senior","Senior"))));
         Assert.Single(restarted.Read().Quarantine);
@@ -171,6 +177,8 @@ public class ProcessTests
         scores = Json.Read<State>(Json.Write(scores));
 
         commands.Command(tournament, "t", "start-game", "o", tournament.Tournaments["t"].Revision, gameId: "g2");
+        FinishPreparation(tournament,commands,"g2");
+        engine.Receive(scores,commands.Events.Last(x=>x.Type=="ReserveScoreboard"));
         engine.Receive(scores, commands.Events.Last());
         engine.Receive(scores, External("SolutionBound", "team", new Binding("second", "a", "task", "normal"), "g2"));
         engine.Receive(scores, External("VerdictRecorded", "checking", new Verdict("second", 1, "Incorrect", "j", "Jury"), "g2"));
@@ -200,6 +208,8 @@ public class ProcessTests
         Assert.Empty(scores.Winners);
         commands.Receive(tournament, first);
         commands.Command(tournament, "t", "start-game", "o", tournament.Tournaments["t"].Revision, gameId: "g2");
+        FinishPreparation(tournament,commands,"g2");
+        engine.Receive(scores,commands.Events.Last(x=>x.Type=="ReserveScoreboard"));
         engine.Receive(scores, commands.Events.Last());
         engine.Receive(scores, External("GameFinalized", "results", standings, "g2"));
 
@@ -213,14 +223,14 @@ public class ProcessTests
         var (ts,te) = Running(); var ss = new State(); var rs = new State(); var se = new Engine("scores"); var re = new Engine("results");
         void Broadcast()
         {
-            foreach(var e in te.Events.Where(e=>e.Type is "TournamentStarted" or "GameStarted" or "SolutionsClosed" or "AppealsClosed").Reverse().ToList()) {se.Receive(ss,e);re.Receive(rs,e);}
+            foreach(var e in te.Events.Where(e=>e.Type is "TournamentStarted" or "ReserveScoreboard" or "GameStarted" or "SolutionsClosed" or "AppealsClosed").Reverse().ToList()) {se.Receive(ss,e);if(e.Type!="ReserveScoreboard")re.Receive(rs,e);}
             foreach(var e in se.Events.Where(e=>e.Type=="ScoresReady").ToList()) re.Receive(rs,e);
             foreach(var e in re.Events.Where(e=>e.Type is "GameFinalized" or "WinnerDetermined").Reverse().ToList()){te.Receive(ts,e);se.Receive(ss,e);}
         }
         Broadcast();
         foreach(var game in new[]{"g1","g2"})
         {
-            if(game=="g2")te.Command(ts,"t","start-game","o",ts.Tournaments["t"].Revision,gameId:game);
+            if(game=="g2"){te.Command(ts,"t","start-game","o",ts.Tournaments["t"].Revision,gameId:game);FinishPreparation(ts,te,game);}
             Broadcast();
             var v = External("VerdictRecorded","checking",new Verdict(game+"anon",1,"Correct","j","Jury"),game);
             se.Receive(ss,External("TeamSealed","team",new TeamSeal([game+"anon"]),game));

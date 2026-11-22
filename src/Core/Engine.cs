@@ -1,6 +1,6 @@
 namespace MathTournament;
 
-public sealed class Engine(string service)
+public sealed partial class Engine(string service, TimeProvider? time = null, Func<string>? newId = null)
 {
     public string Service => service;
     public List<Event> Events { get; } = [];
@@ -60,10 +60,7 @@ public sealed class Engine(string service)
                 Require.That(t.Status == "Running", "tournament_not_running");
                 var next = t.Games.FirstOrDefault(g => g.Status != "Completed");
                 Require.That(next != null && next.Config.Id == gameId && next.Status == "Configured", "previous_game_not_completed_or_wrong_order");
-                next!.Status = "Running";
-                next.SolutionsDue = DateTimeOffset.UtcNow.AddSeconds(next.Config.SolutionSeconds);
-                next.AppealsDue = DateTimeOffset.UtcNow.AddSeconds(next.Config.AppealSeconds);
-                Emit("GameStarted", t, gameId, next); break;
+                BeginPreparation(s,t,next!); break;
             default: throw new RuleException("unknown_command", 400);
         }
         t.Revision++;
@@ -74,6 +71,7 @@ public sealed class Engine(string service)
     }
     public void Tick(State s, DateTimeOffset now)
     {
+        TickPreparations(s,now);
         if (service == "tournament") foreach (var t in s.Tournaments.Values)
         foreach (var g in t.Games.Where(g => g.Status == "Running"))
         {
@@ -93,6 +91,11 @@ public sealed class Engine(string service)
     }
     private bool Allowed(Event e) => (e.Producer, e.Type, service) switch
     {
+        ("tournament","ReserveScoreboard" or "ReleaseScoreboard","scores")=>true,
+        ("tournament","ReserveForms" or "ReleaseForms","simulator")=>true,
+        ("scores","ScoreboardReserved" or "ScoreboardPreparationRejected" or "ScoreboardReleased","tournament")=>true,
+        ("simulator","FormsReserved" or "FormsPreparationRejected" or "FormsReleased","tournament")=>true,
+        ("tournament","TournamentStarted" or "GameStarted","simulator")=>true,
         ("tournament", "TournamentStarted" or "GameStarted" or "SolutionsClosed" or "AppealsClosed", "scores" or "results") => true,
         ("team", "SolutionBound" or "TeamSealed", "scores") => true,
         ("checking", "VerdictRecorded" or "ChecksSealed", "scores") => true,
@@ -118,6 +121,7 @@ public sealed class Engine(string service)
     }
     private bool Apply(State s, Event e)
     {
+        if(IsPreparationEvent(e))return ApplyPreparation(s,e);
         if (e.Type == "TournamentStarted")
         {
             if (!s.Tournaments.ContainsKey(e.TournamentId)) s.Tournaments.Add(e.TournamentId, e.Body<Tournament>());
@@ -141,7 +145,13 @@ public sealed class Engine(string service)
         {
             if (g!.Status == "Configured")
             {
-                var started = e.Body<Game>(); g.Status = "Running"; g.SolutionsDue = started.SolutionsDue; g.AppealsDue = started.AppealsDue;
+                var started = e.Body<Game>();
+                if(service is "scores" or "simulator")
+                {
+                    if(started.PreparationAttemptId is {} attempt&&!s.Reservations.ContainsKey(attempt))return false;
+                    ActivateReservation(s,started);
+                }
+                g.PreparationAttemptId=started.PreparationAttemptId; g.Status = "Running"; g.SolutionsDue = started.SolutionsDue; g.AppealsDue = started.AppealsDue;
                 if (service == "scores")
                 {
                     s.Scores.Add(key, new ScoreGame { Cells = t.Teams.ToDictionary(x => x.Id,

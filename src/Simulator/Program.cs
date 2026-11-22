@@ -13,6 +13,9 @@ if (args.Contains("--healthcheck", StringComparer.Ordinal))
 var builder = WebApplication.CreateBuilder(args);
 var path = builder.Configuration["DB"] ?? "data/simulator.db";
 var store = new Store(path, "simulator");
+builder.Services.AddSingleton(store);
+builder.Services.AddHostedService<SimulatorDelivery>();
+builder.Services.AddHostedService<SimulatorRecovery>();
 var app = builder.Build();
 app.Use(async (context,next) =>
 {
@@ -27,13 +30,33 @@ app.MapPost("/internal/events", (Event e, HttpRequest r) =>
     var expected = builder.Configuration["KEY_" + e.Producer.ToUpperInvariant()] ?? e.Producer + "-integration-demo";
     if (r.Headers.Authorization != "Bearer " + expected) return Results.Unauthorized();
     if (e.Type is "TournamentStarted" or "GameStarted") Validation.Event(e);
-    store.Update((s, _) =>
+    store.Update((s, engine) =>
     {
+        if(e.Type is "TournamentStarted" or "GameStarted" or "ReserveForms" or "ReleaseForms"){engine.Receive(s,e);return;}
         var json = Json.Write(e);
         if (s.Receipts.TryGetValue(e.Id, out var old)) Require.That(old == json, "event_id_payload_conflict");
         else s.Receipts[e.Id] = json;
     });
     return Results.Accepted();
+});
+app.MapPost("/lab/reject-next-forms",(HttpRequest request)=>
+{
+    Require.That(builder.Configuration["ENABLE_LAB_DEMOS"]=="1","lab_disabled",404);
+    Require.That(request.Headers.Authorization=="Bearer "+(builder.Configuration["SIMULATOR_KEY"]??"simulator-demo"),"forbidden",403);
+    store.Update((s,_)=>s.RejectNextForms=true);return Results.Ok(new{armed=true});
+});
+app.MapGet("/lab/reservations",(HttpRequest request)=>
+{
+    Require.That(builder.Configuration["ENABLE_LAB_DEMOS"]=="1","lab_disabled",404);
+    Require.That(request.Headers.Authorization=="Bearer "+(builder.Configuration["SIMULATOR_KEY"]??"simulator-demo"),"forbidden",403);
+    return Results.Ok(new{reservations=store.Read().Reservations.Values});
+});
+app.MapPost("/lab/delivery/{destination}/{action}",(string destination,string action,HttpRequest request)=>
+{
+    Require.That(builder.Configuration["ENABLE_LAB_DEMOS"]=="1","lab_disabled",404);
+    Require.That(request.Headers.Authorization=="Bearer "+(builder.Configuration["SIMULATOR_KEY"]??"simulator-demo"),"forbidden",403);
+    Require.That(destination=="tournament"&&action is "pause" or "resume","invalid_lab_command",400);
+    store.Update((s,_)=>{if(action=="pause")s.PausedDestinations.Add(destination);else s.PausedDestinations.Remove(destination);});return Results.Ok();
 });
 app.MapPost("/fixtures/{tournament}/{game}", async (string tournament, string game, HttpRequest r) =>
 {
