@@ -25,7 +25,43 @@ public sealed class Store
             migration.CommandText = ReadMigration("002_delivery_retry.sql"); migration.ExecuteNonQuery();
         }
         migration.CommandText=ReadMigration("003_public_snapshots.sql");migration.ExecuteNonQuery();
+        migration.CommandText = "SELECT MAX(version) FROM schema_version";
+        if (Convert.ToInt32(migration.ExecuteScalar()) < 4)
+        {
+            migration.CommandText = "SELECT json FROM state WHERE id=1";
+            var state = Json.Read<State>((string)migration.ExecuteScalar()!);
+            UpgradeGameKeys(state);
+            migration.CommandText = "UPDATE state SET json=$json WHERE id=1";
+            migration.Parameters.AddWithValue("$json", Json.Write(state)); migration.ExecuteNonQuery();
+            migration.Parameters.Clear();
+            migration.CommandText = ReadMigration("004_game_keys.sql"); migration.ExecuteNonQuery();
+        }
         tx.Commit();
+    }
+    private static void UpgradeGameKeys(State state)
+    {
+        var keys = state.Tournaments.Values.SelectMany(t => t.Games.Select(g =>
+            (Old: t.Id + "/" + g.Config.Id, New: State.Key(t.Id, g.Config.Id))))
+            .GroupBy(x => x.Old).ToDictionary(g => g.Key, g => g.Select(x => x.New).Distinct().ToArray());
+        Dictionary<string, T> Upgrade<T>(Dictionary<string, T> source)
+        {
+            var result = new Dictionary<string, T>();
+            foreach (var (oldKey, value) in source)
+            {
+                var key = oldKey;
+                if (keys.TryGetValue(oldKey, out var candidates))
+                {
+                    // An already-colliding legacy row has no reliable owner. Roll back the upgrade.
+                    Require.That(candidates.Length == 1, "ambiguous_legacy_game_key");
+                    key = candidates[0];
+                }
+                Require.That(result.TryAdd(key, value), "ambiguous_legacy_game_key");
+            }
+            return result;
+        }
+        state.Scores = Upgrade(state.Scores);
+        state.Finals = Upgrade(state.Finals);
+        state.Snapshots = Upgrade(state.Snapshots);
     }
     public static string Migration
     {

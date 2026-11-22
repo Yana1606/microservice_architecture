@@ -95,6 +95,7 @@ public sealed class State
     public HashSet<string> AppliedEvents { get; set; } = [];
     public Dictionary<string, string> Receipts { get; set; } = [];
     public Dictionary<string, string> Quarantine { get; set; } = [];
-    public static string Key(string tournament, string game) => tournament + "/" + game;
+    // Escape both components, including percent signs, so the separator is unambiguous.
+    public static string Key(string tournament, string game) => Uri.EscapeDataString(tournament) + "/" + Uri.EscapeDataString(game);
 }
 public record Delivery(Event Event, string Destination);

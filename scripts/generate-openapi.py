@@ -16,7 +16,7 @@ schemas={
  'AnonymousReview':obj({'anonymousId':string(),'taskId':string(),'photoUrl':string(),'statement':string(),'reference':string(),'assignedJury':string(),'appeal':{'type':'boolean'},'reason':{'type':'string','nullable':True}}),
  'Standing':obj({'teamId':string(),'score':{'type':'number'},'place':{'type':'integer'},'points':{'type':'integer'}}),
  'ScoreSnapshot':obj({'rows':arr(ref('Standing')),'appliedVerdicts':arr(string())}),
- 'Event':obj({'id':string(),'version':{'type':'integer','enum':[1]},'type':string(),'producer':{'type':'string','enum':['tournament','scores','results','team','checking']},'tournamentId':string(),'gameId':{'type':'string','nullable':True},'occurredAt':{'type':'string','format':'date-time'},'correlationId':string(),'causationId':{'type':'string','nullable':True},'data':{'type':'object'}}),
+ 'Event':obj({'id':string(),'version':{'type':'integer','enum':[1]},'type':string(),'producer':{'type':'string','enum':['tournament','scores','results','team','checking','simulator']},'tournamentId':string(),'gameId':{'type':'string','nullable':True},'occurredAt':{'type':'string','format':'date-time'},'correlationId':string(),'causationId':{'type':'string','nullable':True},'data':{'type':'object'}}),
  'Error':obj({'code':string()})}
 paths={}
 def operation(path,method,summary,body=None,command=False,auth=False,response=None):
