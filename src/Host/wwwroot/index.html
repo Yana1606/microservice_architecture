@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ru">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#111d31"><title>Математическая арена — турнир</title><link rel="stylesheet" href="/styles.css"><script src="/app.js" defer></script></head>
+<body>
+<svg class="svg-library" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs>
+<symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></symbol>
+<symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3M16 5a3 3 0 0 1 0 6m2 4a5 5 0 0 1 3 4v2"/></symbol>
+<symbol id="i-game" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="15" rx="4"/><path d="M7 12h6m-3-3v6m7-5v.01m1 5v.01"/></symbol>
+<symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 3v18h17M9 17V9m5 8V5m5 12v-5"/></symbol>
+<symbol id="i-cup" viewBox="0 0 24 24"><path d="M7 3h10v6a5 5 0 0 1-10 0V3Zm0 2H3v2a5 5 0 0 0 5 5m9-7h4v2a5 5 0 0 1-5 5m-4 2v6m-5 1h10"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-play" viewBox="0 0 24 24"><path d="m9 5 11 7-11 7V5Z"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+<symbol id="i-edit" viewBox="0 0 24 24"><path d="m15 4 5 5M4 20l5-1L21 7a2 2 0 0 0-5-5L4 14v6Z"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="10" cy="10" r="6"/><path d="m15 15 6 6"/></symbol>
+<symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12m-4-4 4 4 4-4M4 16v5h16v-5"/></symbol>
+<symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3"/><circle cx="16" cy="17" r="3"/></symbol>
+<symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+<symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 6M20 5v6h-6"/></symbol>
+</defs></svg>
+<aside class="sidebar">
+ <div class="sidebar-main">
+  <a class="brand" href="#overview" aria-label="Математическая арена, обзор"><span class="brand-mark">∑</span><span>МАТЕМАТИЧЕСКАЯ<small>АРЕНА</small></span></a>
+  <div class="sidebar-caption">ПРОСТРАНСТВО ТУРНИРА</div>
+  <label class="switcher"><span class="switcher-icon">π</span><select id="tournament-select" aria-label="Выбрать турнир"><option value="">Выберите турнир</option></select></label>
+  <nav aria-label="Основная навигация">
+   <button class="nav-item active" data-view="overview"><svg><use href="#i-grid"/></svg>Обзор турнира</button>
+   <button class="nav-item" data-view="teams"><svg><use href="#i-users"/></svg>Команды<span id="team-count" class="nav-count">0</span></button>
+   <button class="nav-item" data-view="games"><svg><use href="#i-game"/></svg>Игры</button>
+   <button class="nav-item" data-view="table"><svg><use href="#i-chart"/></svg>Онлайн-таблица<span class="live-small">LIVE</span></button>
+   <button class="nav-item" data-view="results"><svg><use href="#i-cup"/></svg>Итоги турнира</button>
+  </nav>
+  <div class="sidebar-note"><span class="mini-math">x² + y²</span><strong>Точность решает.</strong><p>Каждая задача — новый шанс изменить игру.</p></div>
+ </div>
+ <div class="sidebar-bottom"><button id="account-button" aria-label="Сменить учётную запись" class="account"><span class="avatar">З</span><span><strong id="account-name">Зритель</strong><small id="account-role">Просмотр результатов</small></span><svg><use href="#i-settings"/></svg></button></div>
+</aside>
+<div class="workspace">
+ <header class="topbar"><div class="breadcrumbs">Турниры <span>/</span> <strong id="breadcrumb">Математическая арена</strong></div><div class="header-right"><span id="connection" class="connection"><span></span>Подключение</span><button class="icon-button" id="refresh-button" title="Обновить данные" aria-label="Обновить данные"><svg aria-hidden="true"><use href="#i-refresh"/></svg></button></div></header>
+ <main id="main" tabindex="-1">
+  <div class="page-heading"><div><div class="eyebrow">МАТЕМАТИКА. КОМАНДА. ПОБЕДА.</div><h1 id="page-title">Обзор турнира</h1><p id="page-subtitle">Всё, что происходит на арене, — в одном месте.</p></div><div class="heading-actions"><button class="button secondary" id="demo-button"><svg><use href="#i-play"/></svg>Демо</button><button class="button primary" id="create-button"><svg><use href="#i-plus"/></svg>Создать турнир</button></div></div>
+  <div id="demo-banner" class="demo-banner" hidden role="status"><span class="spinner"></span><div><strong>Демонстрационный турнир</strong><span id="demo-progress">Подготовка…</span></div><span>Данные создаёт тестовый имитатор</span></div>
+  <div id="content" aria-live="polite"></div>
+  <footer class="footer"><span><span class="footer-mark">∑</span> Математическая арена</span><span>Честная игра. Прозрачные результаты.</span></footer>
+ </main>
+</div>
+<div id="toast" class="toast" hidden role="status"></div>
+<dialog id="modal"><form id="modal-form"><div class="modal-heading"><div><span class="eyebrow" id="modal-eyebrow">НАСТРОЙКА ТУРНИРА</span><h2 id="modal-title"></h2></div><button type="button" class="icon-button" id="close-modal" aria-label="Закрыть"><svg aria-hidden="true"><use href="#i-close"/></svg></button></div><div id="modal-body"></div><p id="form-error" class="form-error" role="alert"></p><div class="modal-actions"><button type="button" class="button secondary" id="cancel-modal">Отмена</button><button type="submit" class="button primary" id="modal-submit">Сохранить</button></div></form></dialog>
+</body></html>

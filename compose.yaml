@@ -1,0 +1,52 @@
+name: math-tournament
+x-common: &common
+  build: .
+  restart: unless-stopped
+  environment: &environment
+    ASPNETCORE_URLS: http://+:8080
+    PEER_TOURNAMENT: http://tournament:8080
+    PEER_SCORES: http://scores:8080
+    PEER_RESULTS: http://results:8080
+    PEER_SIMULATOR: http://simulator:8080
+    DB: /data/service.db
+services:
+  tournament:
+    <<: *common
+    environment:
+      <<: *environment
+      SERVICE: tournament
+    ports: ["127.0.0.1:5101:8080"]
+    volumes: ["tournament:/data"]
+  scores:
+    <<: *common
+    environment:
+      <<: *environment
+      SERVICE: scores
+    ports: ["127.0.0.1:5102:8080"]
+    volumes: ["scores:/data"]
+  results:
+    <<: *common
+    environment:
+      <<: *environment
+      SERVICE: results
+    ports: ["127.0.0.1:5103:8080"]
+    volumes: ["results:/data"]
+  simulator:
+    <<: *common
+    command: ["simulator/Simulator.dll"]
+    environment:
+      <<: *environment
+      SCORES_URL: http://scores:8080
+    ports: ["127.0.0.1:5104:8080"]
+    volumes: ["simulator:/data"]
+  tests:
+    image: mcr.microsoft.com/dotnet/sdk:8.0
+    profiles: ["test"]
+    working_dir: /source
+    volumes: [".:/source"]
+    command: ["dotnet", "test", "tests/Tests.csproj", "--logger", "trx", "--results-directory", "test-results"]
+volumes:
+  tournament:
+  scores:
+  results:
+  simulator:
