@@ -13,18 +13,30 @@ public sealed class Store
         connectionString = new SqliteConnectionStringBuilder { DataSource = path, DefaultTimeout = 10 }.ToString();
         this.service = service;
         using var c = Open();
-        using var migration = c.CreateCommand();
-        migration.CommandText = Migration;
+        using var journal = c.CreateCommand(); journal.CommandText = "PRAGMA journal_mode=WAL"; journal.ExecuteNonQuery();
+        using var tx = c.BeginTransaction(deferred: false);
+        using var migration = c.CreateCommand(); migration.Transaction = tx;
+        migration.CommandText = Migration.Replace("PRAGMA journal_mode=WAL;", "", StringComparison.Ordinal);
         migration.ExecuteNonQuery();
+        migration.CommandText = "SELECT MAX(version) FROM schema_version";
+        if (Convert.ToInt32(migration.ExecuteScalar()) < 2)
+        {
+            migration.CommandText = ReadMigration("002_delivery_retry.sql"); migration.ExecuteNonQuery();
+        }
+        tx.Commit();
     }
     public static string Migration
     {
         get
         {
-            var assembly = typeof(Store).Assembly;
-            using var stream = assembly.GetManifestResourceStream(assembly.GetManifestResourceNames().Single(x => x.EndsWith("001_initial.sql", StringComparison.Ordinal)))!;
-            using var reader = new StreamReader(stream); return reader.ReadToEnd();
+            return ReadMigration("001_initial.sql");
         }
+    }
+    private static string ReadMigration(string name)
+    {
+        var assembly = typeof(Store).Assembly;
+        using var stream = assembly.GetManifestResourceStream(assembly.GetManifestResourceNames().Single(x => x.EndsWith(name, StringComparison.Ordinal)))!;
+        using var reader = new StreamReader(stream); return reader.ReadToEnd();
     }
     private SqliteConnection Open() { var c = new SqliteConnection(connectionString); c.Open(); return c; }
     public State Read()
@@ -83,16 +95,35 @@ public sealed class Store
         "ScoreChanged" or "AppealScoreChanged" or "InitialResultsCreated" or "TournamentPointsUpdated" => ["simulator"],
         _ => []
     };
-    public List<Delivery> Pending()
+    public List<Delivery> Pending(DateTimeOffset? dueAt = null, int perDestination = 25)
     {
-        using var c = Open(); using var q = c.CreateCommand(); q.CommandText = "SELECT json,destination FROM outbox WHERE sent=0 LIMIT 100";
+        using var c = Open(); using var q = c.CreateCommand();
+        q.CommandText = """
+            SELECT json,destination FROM (
+              SELECT json,destination,rowid AS position,
+                ROW_NUMBER() OVER(PARTITION BY destination ORDER BY rowid) AS destination_row
+              FROM outbox WHERE sent=0 AND ($due IS NULL OR next_attempt_ms <= $due)
+            ) WHERE destination_row <= $limit ORDER BY destination,position
+            """;
+        q.Parameters.AddWithValue("$due", (object?)dueAt?.ToUnixTimeMilliseconds() ?? DBNull.Value);
+        q.Parameters.AddWithValue("$limit", perDestination);
         using var r = q.ExecuteReader(); var rows = new List<Delivery>();
         while (r.Read()) rows.Add(new Delivery(Json.Read<Event>(r.GetString(0)), r.GetString(1))); return rows;
     }
-    public void Delivered(Delivery d, string? error = null)
+    public long PendingCount()
+    {
+        using var c = Open(); using var q = c.CreateCommand(); q.CommandText = "SELECT COUNT(*) FROM outbox WHERE sent=0";
+        return (long)q.ExecuteScalar()!;
+    }
+    public void Delivered(Delivery d, string? error = null, DateTimeOffset? now = null)
     {
         using var c = Open(); using var q = c.CreateCommand();
-        q.CommandText = "UPDATE outbox SET sent=$sent,attempts=attempts+1,last_error=$error WHERE id=$id AND destination=$dest";
+        q.CommandText = """
+            UPDATE outbox SET sent=$sent,attempts=attempts+1,last_error=$error,
+              next_attempt_ms=CASE WHEN $sent=1 THEN 0 ELSE $now + MIN(60000,1000 * (1 << MIN(attempts,6))) END
+            WHERE id=$id AND destination=$dest
+            """;
+        q.Parameters.AddWithValue("$now", (now ?? DateTimeOffset.UtcNow).ToUnixTimeMilliseconds());
         q.Parameters.AddWithValue("$sent", error == null ? 1 : 0); q.Parameters.AddWithValue("$error", (object?)error ?? DBNull.Value);
         q.Parameters.AddWithValue("$id", d.Event.Id); q.Parameters.AddWithValue("$dest", d.Destination); q.ExecuteNonQuery();
     }

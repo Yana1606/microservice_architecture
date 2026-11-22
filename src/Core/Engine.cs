@@ -9,11 +9,8 @@ public sealed class Engine(string service)
     public void Create(State s, Tournament t, string actor)
     {
         Require.That(service == "tournament", "wrong_service");
+        Validation.Tournament(t);
         Require.That(!s.Tournaments.ContainsKey(t.Id), "tournament_exists");
-        Require.That(!string.IsNullOrWhiteSpace(t.Id) && !string.IsNullOrWhiteSpace(t.Name) &&
-            t.TeamSize == 4 && t.Starts < t.Ends && t.Jury.Count >= 2 && t.Jury.Distinct().Count() == t.Jury.Count &&
-            t.Jury.All(x => !string.IsNullOrWhiteSpace(x)) && t.Jury.Contains(t.Senior) &&
-            t.TiePolicy == "SharedCompetition", "invalid_tournament", 400);
         t.Organizer = actor; t.Status = "Draft"; t.Games = []; t.Teams = []; t.Revision = 1;
         s.Tournaments.Add(t.Id, t); Emit("TournamentCreated", t, null, t);
     }
@@ -46,9 +43,7 @@ public sealed class Engine(string service)
                 {
                 Require.That(t.Status == "Registration", "registration_closed");
                 Require.That(team != null && team.Captain == actor, "captain_required", 403);
-                Require.That(team!.Members.Count == 4 && team.Members.Distinct().Count() == 4 &&
-                    team.Members.Contains(actor) && team.Members.All(x => !string.IsNullOrWhiteSpace(x)) &&
-                    !string.IsNullOrWhiteSpace(team.Id) && !string.IsNullOrWhiteSpace(team.Name), "exactly_four_distinct_members", 400);
+                Validation.Team(team!);
                 Require.That(!t.Teams.Any(x => x.Id == team.Id || x.Members.Intersect(team.Members).Any()), "team_or_member_already_registered");
                 }
                 catch (RuleException ex)
@@ -75,11 +70,7 @@ public sealed class Engine(string service)
     }
     public static void Validate(GameConfig g)
     {
-        Require.That(g != null && !string.IsNullOrWhiteSpace(g.Id) && !string.IsNullOrWhiteSpace(g.Type) &&
-            g.Tasks.Count > 0 && g.Tasks.Select(x => x.Id).Distinct().Count() == g.Tasks.Count &&
-            g.Tasks.All(x => !string.IsNullOrWhiteSpace(x.Id) && !string.IsNullOrWhiteSpace(x.Statement) && !string.IsNullOrWhiteSpace(x.Reference)) &&
-            g.Modifiers.Count > 0 && g.Modifiers.All(x => !string.IsNullOrWhiteSpace(x.Key) && x.Value > 0) &&
-            g.SolutionSeconds > 0 && g.AppealSeconds >= g.SolutionSeconds, "invalid_game", 400);
+        Validation.Game(g);
     }
     public void Tick(State s, DateTimeOffset now)
     {
@@ -93,8 +84,9 @@ public sealed class Engine(string service)
     }
     public void Receive(State s, Event e)
     {
-        Require.That(e.Version == 1 && !string.IsNullOrWhiteSpace(e.Id), "unsupported_event", 400);
+        Require.That(e is not null && e.Version == 1, "unsupported_event", 400);
         Require.That(Allowed(e), "event_producer_or_type_forbidden", 403);
+        Validation.Event(e);
         var fingerprint = Json.Write(e);
         if (s.Receipts.TryGetValue(e.Id, out var previous)) { Require.That(previous == fingerprint, "event_id_payload_conflict"); return; }
         s.Receipts.Add(e.Id, fingerprint); s.Pending.Add(e.Id, e); Drain(s);
@@ -198,6 +190,8 @@ public sealed class Engine(string service)
         if (e.Type == "SolutionBound")
         {
             var b = e.Body<Binding>();
+            if (score.Bindings.TryGetValue(b.AnonymousId, out var repeated))
+            { Require.That(repeated == b, "binding_conflict"); return true; }
             Require.That(!score.Ready && (score.TeamSeal == null || score.TeamSeal.Contains(b.AnonymousId)), "submission_after_seal");
             Require.That(score.Cells.ContainsKey(b.TeamId) && score.Cells[b.TeamId].ContainsKey(b.TaskId) && g.Config.Modifiers.ContainsKey(b.FormType), "invalid_binding");
             if (score.Bindings.TryGetValue(b.AnonymousId, out var prior)) Require.That(prior == b, "binding_conflict");
@@ -212,22 +206,19 @@ public sealed class Engine(string service)
             var v = e.Body<Verdict>();
             if (!score.Bindings.TryGetValue(v.AnonymousId, out var b)) return false;
             var cell = score.Cells[b.TeamId][b.TaskId];
-            Require.That(!score.Ready && (score.CheckSeal == null || score.CheckSeal.Contains(e.Id)), "verdict_after_seal");
             Require.That(t.Jury.Contains(v.JuryId) && (v.Authority == "Jury" || v.Authority == "Senior" && v.JuryId == t.Senior), "invalid_jury");
             Require.That(v.Revision is 1 or 2, "invalid_verdict_revision");
             Require.That(v.Revision == 1 ? v.Outcome is "Correct" or "Incorrect" : v.Outcome is "AppealUpheld" or "AppealRejected", "invalid_outcome");
             var semantic = v.AnonymousId + "/" + v.Revision;
             if (score.Verdicts.TryGetValue(semantic, out var old))
             { Require.That(old == v, "conflicting_verdict"); score.Applied.Add(e.Id); return true; }
+            Require.That(!score.Ready && (score.CheckSeal == null || score.CheckSeal.Contains(e.Id)), "verdict_after_seal");
             if (v.Revision == 2 && cell.Revision == 0) return false;
             if (v.Revision == 2)
             {
                 Require.That(cell.Status == "Incorrect", "appeal_requires_incorrect");
-                var alreadyAppealed = t.Games.Any(game =>
-                    s.Scores.TryGetValue(State.Key(t.Id, game.Config.Id), out var gameScore) &&
-                    gameScore.Cells[b.TeamId].TryGetValue(b.TaskId, out var priorCell) &&
-                    priorCell.Revision == 2);
-                Require.That(!alreadyAppealed, "appeal_already_used");
+                var alreadyAppealed=t.Games.Any(game=>s.Scores.TryGetValue(State.Key(t.Id,game.Config.Id),out var priorGame)&&priorGame.Cells[b.TeamId].TryGetValue(b.TaskId,out var priorCell)&&priorCell.Revision==2);
+                Require.That(!alreadyAppealed,"appeal_already_used");
             }
             score.Verdicts.Add(semantic, v);
             var rule = g.Config.Tasks.Single(x => x.Id == b.TaskId);
@@ -251,12 +242,19 @@ public sealed class Engine(string service)
             var key = State.Key(t.Id, g.Config.Id);
             if (!s.Scores.TryGetValue(key, out var sc) || sc.Ready || !g.SolutionsClosed || !g.AppealsClosed ||
                 sc.TeamSeal == null || sc.CheckSeal == null || !sc.TeamSeal.ToHashSet().SetEquals(sc.Bindings.Keys) ||
-                !sc.CheckSeal.ToHashSet().SetEquals(sc.Applied) || sc.Bindings.Values.Any(b => sc.Cells[b.TeamId][b.TaskId].Revision == 0) ||
+                !EquivalentVerdicts(s, sc) || sc.Bindings.Values.Any(b => sc.Cells[b.TeamId][b.TaskId].Revision == 0) ||
                 s.Pending.Values.Any(e => e.TournamentId == t.Id && e.GameId == g.Config.Id) ||
                 s.Quarantine.Keys.Any(id => { var e = Json.Read<Event>(s.Receipts[id]); return e.TournamentId == t.Id && e.GameId == g.Config.Id; })) continue;
             sc.Ready = true;
             Emit("ScoresReady", t, g.Config.Id, new ScoreSnapshot(sc.Cells.Select(x => new Standing(x.Key, x.Value.Values.Sum(c => c.Points), 0, 0)).ToList(), sc.Applied.Order().ToList()));
         }
+    }
+    private static bool EquivalentVerdicts(State s, ScoreGame score)
+    {
+        if (score.CheckSeal is null || !score.CheckSeal.All(score.Applied.Contains)) return false;
+        // Re-publication with a new transport ID must not block finalization of the same verdict.
+        var expected = score.CheckSeal.Select(id => Json.Read<Event>(s.Receipts[id]).Body<Verdict>()).ToHashSet();
+        return score.Applied.Select(id => Json.Read<Event>(s.Receipts[id]).Body<Verdict>()).ToHashSet().SetEquals(expected);
     }
     public static List<Standing> Rank(IEnumerable<(string Team, decimal Score)> source) => source
         .OrderByDescending(x => x.Score).ThenBy(x => x.Team, StringComparer.Ordinal)

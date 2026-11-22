@@ -2,16 +2,31 @@ using MathTournament;
 using System.Net.Http.Headers;
 using System.Text;
 
+if (args.Contains("--healthcheck", StringComparer.Ordinal))
+{
+    try { using var client=new HttpClient{Timeout=TimeSpan.FromSeconds(2)};using var response=await client.GetAsync("http://127.0.0.1:8080/health");Environment.ExitCode=response.IsSuccessStatusCode?0:1; }
+    catch(HttpRequestException){Environment.ExitCode=1;}
+    catch(TaskCanceledException){Environment.ExitCode=1;}
+    return;
+}
 // Test fixture only: does not implement team workflows or jury assignment.
 var builder = WebApplication.CreateBuilder(args);
 var path = builder.Configuration["DB"] ?? "data/simulator.db";
 var store = new Store(path, "simulator");
 var app = builder.Build();
+app.Use(async (context,next) =>
+{
+    try { await next(context); }
+    catch (RuleException ex) { context.Response.StatusCode=ex.Status;await context.Response.WriteAsJsonAsync(new{code=ex.Message}); }
+    catch (System.Text.Json.JsonException) { context.Response.StatusCode=400;await context.Response.WriteAsJsonAsync(new{code="invalid_json"}); }
+});
 app.MapGet("/health", () => new { status = "ok", mode = "test-simulator" });
 app.MapPost("/internal/events", (Event e, HttpRequest r) =>
 {
+    Validation.Envelope(e);
     var expected = builder.Configuration["KEY_" + e.Producer.ToUpperInvariant()] ?? e.Producer + "-integration-demo";
     if (r.Headers.Authorization != "Bearer " + expected) return Results.Unauthorized();
+    if (e.Type is "TournamentStarted" or "GameStarted") Validation.Event(e);
     store.Update((s, _) =>
     {
         var json = Json.Write(e);

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Diagnostics.CodeAnalysis;
 namespace MathTournament;
 
 public static class Json
@@ -10,7 +11,7 @@ public static class Json
 public sealed class RuleException(string code, int status = 409) : Exception(code) { public int Status { get; } = status; }
 public static class Require
 {
-    public static void That(bool condition, string code, int status = 409) { if (!condition) throw new RuleException(code, status); }
+    public static void That([DoesNotReturnIf(false)] bool condition, string code, int status = 409) { if (!condition) throw new RuleException(code, status); }
 }
 public record TaskRule(string Id, string Statement, string Reference, decimal Correct, decimal Incorrect);
 public record GameConfig(string Id, string Type, List<TaskRule> Tasks, Dictionary<string, decimal> Modifiers,
@@ -54,7 +55,7 @@ public record ScoreSnapshot(List<Standing> Rows, List<string> AppliedVerdicts);
 public record Event(string Id, int Version, string Type, string Producer, string TournamentId,
     string? GameId, DateTimeOffset OccurredAt, string CorrelationId, string? CausationId, JsonElement Data)
 {
-    public T Body<T>() => Data.Deserialize<T>(Json.Options)!;
+    public T Body<T>() => Data.Deserialize<T>(Json.Options) ?? throw new RuleException("invalid_event_payload", 400);
     public static Event Create<T>(string type, string producer, string tournament, string? game, T body,
         string? cause = null) => new(Guid.NewGuid().ToString("N"), 1, type, producer, tournament, game,
         DateTimeOffset.UtcNow, tournament, cause, JsonSerializer.SerializeToElement(body, Json.Options));

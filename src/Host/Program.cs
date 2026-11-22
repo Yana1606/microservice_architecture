@@ -4,6 +4,13 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 
+if (args.Contains("--healthcheck", StringComparer.Ordinal))
+{
+    try { using var client=new HttpClient{Timeout=TimeSpan.FromSeconds(2)};using var response=await client.GetAsync("http://127.0.0.1:8080/health");Environment.ExitCode=response.IsSuccessStatusCode?0:1; }
+    catch(HttpRequestException){Environment.ExitCode=1;}
+    catch(TaskCanceledException){Environment.ExitCode=1;}
+    return;
+}
 var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 {
     Args = args,
@@ -15,6 +22,8 @@ var store = new Store(builder.Configuration["DB"] ?? $"data/{service}.db", servi
 builder.Services.AddSingleton(store);
 builder.Services.AddSingleton(new ServiceName(service));
 builder.Services.AddHttpClient("ui", client => client.Timeout = TimeSpan.FromSeconds(15));
+builder.Services.Configure<RouteHandlerOptions>(options => options.ThrowOnBadRequest = true);
+builder.Services.AddHostedService<DeadlineWorker>();
 builder.Services.AddHostedService<DeliveryWorker>();
 var app = builder.Build();
 app.UseDefaultFiles();
@@ -24,6 +33,7 @@ app.Use(async (context, next) =>
     try { await next(context); }
     catch (RuleException e) { context.Response.StatusCode = e.Status; await context.Response.WriteAsJsonAsync(new { code = e.Message }); }
     catch (JsonException) { context.Response.StatusCode = 400; await context.Response.WriteAsJsonAsync(new { code = "invalid_json" }); }
+    catch (BadHttpRequestException) { context.Response.StatusCode = 400; await context.Response.WriteAsJsonAsync(new { code = "invalid_request" }); }
 });
 string Actor(HttpRequest r, string role)
 {
@@ -82,7 +92,7 @@ app.MapPost("/internal/events", (Event e, HttpRequest r) =>
 app.MapGet("/internal/diagnostics", (HttpRequest r) =>
 {
     Actor(r, "organizer"); var s = store.Read();
-    return Results.Ok(new { pending = s.Pending.Keys, s.Quarantine, outboxPending = store.Pending().Count });
+    return Results.Ok(new { pending = s.Pending.Keys, s.Quarantine, outboxPending = store.PendingCount() });
 });
 if (service == "tournament")
 {
@@ -174,31 +184,37 @@ static object Table(State s, string id)
                 final = s.Finals.GetValueOrDefault(State.Key(id, g.Config.Id))?.SingleOrDefault(x => x.TeamId == rank.TeamId) }) }) };
 }
 record ServiceName(string Value);
+sealed class DeadlineWorker(Store store, ILogger<DeadlineWorker> log) : BackgroundService
+{
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        await Task.Yield();
+        using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(250));
+        do
+        {
+            try { store.Update((state, engine) => engine.Tick(state, DateTimeOffset.UtcNow)); }
+            catch (Exception ex) { log.LogError(ex, "Deadline/state processing failed; will retry"); }
+        } while (await timer.WaitForNextTickAsync(stoppingToken));
+    }
+}
 sealed class DeliveryWorker(Store store, ServiceName service, IConfiguration config, ILogger<DeliveryWorker> log) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        await Task.Yield();
         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
+        string Address(string destination)
+        {
+            var port = destination switch { "tournament" => 5101, "scores" => 5102, "results" => 5103, _ => 5104 };
+            return config["PEER_" + destination.ToUpperInvariant()] ?? $"http://localhost:{port}";
+        }
+        var dispatcher = new DeliveryDispatcher(store, http, Address,
+            config["KEY_" + service.Value.ToUpperInvariant()] ?? service.Value + "-integration-demo");
         while (!stoppingToken.IsCancellationRequested)
         {
-            try
-            {
-                store.Update((s, engine) => engine.Tick(s, DateTimeOffset.UtcNow));
-                foreach (var d in store.Pending())
-                {
-                    try
-                    {
-                        var defaultPort = d.Destination switch { "tournament" => 5101, "scores" => 5102, "results" => 5103, _ => 5104 };
-                        var url = config["PEER_" + d.Destination.ToUpperInvariant()] ?? $"http://localhost:{defaultPort}";
-                        using var request = new HttpRequestMessage(HttpMethod.Post, url + "/internal/events");
-                        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", config["KEY_" + service.Value.ToUpperInvariant()] ?? service.Value + "-integration-demo");
-                        request.Content = new StringContent(Json.Write(d.Event), Encoding.UTF8, "application/json");
-                        using var response = await http.SendAsync(request, stoppingToken); response.EnsureSuccessStatusCode(); store.Delivered(d);
-                    }
-                    catch (Exception e) when (e is HttpRequestException or TaskCanceledException) { store.Delivered(d, e.Message); }
-                }
-            }
-            catch (Exception e) { log.LogError(e, "Background iteration failed"); }
+            try { await dispatcher.DispatchAsync(stoppingToken); }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
+            catch (Exception ex) { log.LogError(ex, "Delivery failed; durable outbox retained"); }
             await Task.Delay(250, stoppingToken);
         }
     }
