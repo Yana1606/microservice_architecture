@@ -3,3 +3,8 @@
 data
 logs
 test-results
+
+.git
+release
+**/__pycache__
+.env

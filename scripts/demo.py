@@ -1,5 +1,5 @@
 """HTTP acceptance scenario, stdlib only. Services must already be running."""
-import json, time, urllib.request, urllib.error, uuid, sys
+import json, time, urllib.request, urllib.error, uuid, sys, os
 from pathlib import Path
 
 tid = sys.argv[1] if len(sys.argv) > 1 else 'demo'
@@ -9,7 +9,8 @@ def request(port, path, method='GET', body=None, actor=None, revision=None, key=
     if revision is not None: headers['If-Match'] = str(revision)
     if method != 'GET': headers['Idempotency-Key'] = key or uuid.uuid4().hex
     data = json.dumps(body).encode() if body is not None else (b'' if method != 'GET' else None)
-    req = urllib.request.Request(f'http://localhost:{port}'+path, data=data, method=method, headers=headers)
+    actual_port=int(os.environ.get('MATH_BASE_PORT','5101'))+port-5101
+    req = urllib.request.Request(f'http://localhost:{actual_port}'+path, data=data, method=method, headers=headers)
     with urllib.request.urlopen(req, timeout=15) as response:
         content = response.read()
         return json.loads(content) if content else None
@@ -78,4 +79,4 @@ for port in (5101,5102,5103):
 result={'scenario':'2 teams / 2 games; reversed and duplicate events; appeals; sequential games','status':'passed','table':table}
 output=Path(__file__).parent.parent/'test-results';output.mkdir(exist_ok=True)
 (output/'http-scenario.json').write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
-print('PASS: complete tournament; A=200, B=196. Table: http://localhost:5102')
+print('PASS: complete tournament; A=200, B=196. Table: http://localhost:'+str(int(os.environ.get('MATH_BASE_PORT','5101'))+1))

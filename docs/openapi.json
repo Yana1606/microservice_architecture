@@ -16,6 +16,10 @@
     {
       "url": "http://localhost:5103",
       "description": "Results"
+    },
+    {
+      "url": "http://localhost:5104",
+      "description": "Simulator"
     }
   ],
   "paths": {
@@ -380,7 +384,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "$ref": "#/components/schemas/CommandResponse"
                 }
               }
             }
@@ -642,7 +646,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "$ref": "#/components/schemas/CommandResponse"
                 }
               }
             }
@@ -756,7 +760,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "$ref": "#/components/schemas/CommandResponse"
                 }
               }
             }
@@ -854,7 +858,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "$ref": "#/components/schemas/CommandResponse"
                 }
               }
             }
@@ -962,7 +966,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "$ref": "#/components/schemas/CommandResponse"
                 }
               }
             }
@@ -1060,7 +1064,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "$ref": "#/components/schemas/CommandResponse"
                 }
               }
             }
@@ -1166,7 +1170,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "$ref": "#/components/schemas/CommandResponse"
                 }
               }
             }
@@ -1354,6 +1358,383 @@
             }
           }
         ],
+        "responses": {
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Domain constraint or concurrency conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "If-Match required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/lab/status": {
+      "get": {
+        "summary": "Local educational controls availability",
+        "parameters": [],
+        "responses": {
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Domain constraint or concurrency conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "If-Match required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/lab/delivery/{destination}/{action}": {
+      "post": {
+        "summary": "Local demo only: pause/resume a recipient; organizer token or simulator key",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "destination",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "action",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Domain constraint or concurrency conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "If-Match required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/lab/reject-next-forms": {
+      "post": {
+        "summary": "Simulator local demo only: reject the next form reservation",
+        "parameters": [],
+        "responses": {
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Domain constraint or concurrency conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "If-Match required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/lab/reservations": {
+      "get": {
+        "summary": "Simulator local demo only: inspect local form reservations",
+        "parameters": [],
+        "responses": {
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Domain constraint or concurrency conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "If-Match required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/ui-api/lab/reject-next-forms": {
+      "post": {
+        "summary": "UI local demo: arm the form rejection; organizer only",
+        "parameters": [],
         "responses": {
           "400": {
             "description": "Invalid request",
@@ -1752,6 +2133,373 @@
         ]
       },
       "Event": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/TournamentCreatedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/TournamentStartedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/GamesConfiguredEvent"
+          },
+          {
+            "$ref": "#/components/schemas/TournamentPublishedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/TeamRegisteredEvent"
+          },
+          {
+            "$ref": "#/components/schemas/RegistrationRejectedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/GameStartedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/SolutionsClosedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/AppealsClosedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/InitialResultsCreatedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/SolutionBoundEvent"
+          },
+          {
+            "$ref": "#/components/schemas/VerdictRecordedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/TeamSealedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/ChecksSealedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/ScoreChangedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/AppealScoreChangedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/ScoresReadyEvent"
+          },
+          {
+            "$ref": "#/components/schemas/GameFinalizedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/TournamentPointsUpdatedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/WinnerDeterminedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/TournamentCompletedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/ReserveScoreboardEvent"
+          },
+          {
+            "$ref": "#/components/schemas/ReserveFormsEvent"
+          },
+          {
+            "$ref": "#/components/schemas/ReleaseScoreboardEvent"
+          },
+          {
+            "$ref": "#/components/schemas/ReleaseFormsEvent"
+          },
+          {
+            "$ref": "#/components/schemas/ScoreboardReservedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/FormsReservedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/ScoreboardReleasedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/FormsReleasedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/ScoreboardPreparationRejectedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/FormsPreparationRejectedEvent"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "TournamentCreated": "#/components/schemas/TournamentCreatedEvent",
+            "TournamentStarted": "#/components/schemas/TournamentStartedEvent",
+            "GamesConfigured": "#/components/schemas/GamesConfiguredEvent",
+            "TournamentPublished": "#/components/schemas/TournamentPublishedEvent",
+            "TeamRegistered": "#/components/schemas/TeamRegisteredEvent",
+            "RegistrationRejected": "#/components/schemas/RegistrationRejectedEvent",
+            "GameStarted": "#/components/schemas/GameStartedEvent",
+            "SolutionsClosed": "#/components/schemas/SolutionsClosedEvent",
+            "AppealsClosed": "#/components/schemas/AppealsClosedEvent",
+            "InitialResultsCreated": "#/components/schemas/InitialResultsCreatedEvent",
+            "SolutionBound": "#/components/schemas/SolutionBoundEvent",
+            "VerdictRecorded": "#/components/schemas/VerdictRecordedEvent",
+            "TeamSealed": "#/components/schemas/TeamSealedEvent",
+            "ChecksSealed": "#/components/schemas/ChecksSealedEvent",
+            "ScoreChanged": "#/components/schemas/ScoreChangedEvent",
+            "AppealScoreChanged": "#/components/schemas/AppealScoreChangedEvent",
+            "ScoresReady": "#/components/schemas/ScoresReadyEvent",
+            "GameFinalized": "#/components/schemas/GameFinalizedEvent",
+            "TournamentPointsUpdated": "#/components/schemas/TournamentPointsUpdatedEvent",
+            "WinnerDetermined": "#/components/schemas/WinnerDeterminedEvent",
+            "TournamentCompleted": "#/components/schemas/TournamentCompletedEvent",
+            "ReserveScoreboard": "#/components/schemas/ReserveScoreboardEvent",
+            "ReserveForms": "#/components/schemas/ReserveFormsEvent",
+            "ReleaseScoreboard": "#/components/schemas/ReleaseScoreboardEvent",
+            "ReleaseForms": "#/components/schemas/ReleaseFormsEvent",
+            "ScoreboardReserved": "#/components/schemas/ScoreboardReservedEvent",
+            "FormsReserved": "#/components/schemas/FormsReservedEvent",
+            "ScoreboardReleased": "#/components/schemas/ScoreboardReleasedEvent",
+            "FormsReleased": "#/components/schemas/FormsReleasedEvent",
+            "ScoreboardPreparationRejected": "#/components/schemas/ScoreboardPreparationRejectedEvent",
+            "FormsPreparationRejected": "#/components/schemas/FormsPreparationRejectedEvent"
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code"
+        ]
+      },
+      "Game": {
+        "type": "object",
+        "properties": {
+          "config": {
+            "$ref": "#/components/schemas/GameConfig"
+          },
+          "status": {
+            "type": "string"
+          },
+          "solutionsDue": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "appealsDue": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "solutionsClosed": {
+            "type": "boolean"
+          },
+          "appealsClosed": {
+            "type": "boolean"
+          },
+          "preparationAttemptId": {
+            "type": "string",
+            "nullable": true
+          },
+          "preparationStatus": {
+            "type": "string",
+            "nullable": true
+          },
+          "preparationFailure": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "config",
+          "status"
+        ]
+      },
+      "TournamentSnapshot": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "starts": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "ends": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "teamSize": {
+            "type": "integer",
+            "enum": [
+              4
+            ]
+          },
+          "jury": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "senior": {
+            "type": "string"
+          },
+          "regulation": {
+            "type": "string"
+          },
+          "tiePolicy": {
+            "type": "string",
+            "enum": [
+              "SharedCompetition"
+            ]
+          },
+          "organizer": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "status": {
+            "type": "string"
+          },
+          "teams": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Team"
+            }
+          },
+          "games": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Game"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "starts",
+          "ends",
+          "teamSize",
+          "jury",
+          "senior",
+          "regulation",
+          "tiePolicy",
+          "organizer",
+          "revision",
+          "status",
+          "teams",
+          "games"
+        ]
+      },
+      "PreparationRequest": {
+        "type": "object",
+        "properties": {
+          "attemptId": {
+            "type": "string"
+          },
+          "config": {
+            "$ref": "#/components/schemas/GameConfig"
+          },
+          "teamIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "attemptId",
+          "config",
+          "teamIds"
+        ]
+      },
+      "PreparationReply": {
+        "type": "object",
+        "properties": {
+          "attemptId": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "attemptId"
+        ]
+      },
+      "ScoreChange": {
+        "type": "object",
+        "properties": {
+          "teamId": {
+            "type": "string"
+          },
+          "taskId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "points": {
+            "type": "number"
+          },
+          "gameTotal": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "teamId",
+          "taskId",
+          "status",
+          "points",
+          "gameTotal"
+        ]
+      },
+      "CommandResponse": {
+        "type": "object",
+        "properties": {
+          "accepted": {
+            "type": "boolean"
+          },
+          "tournaments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "revision": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "status": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "revision",
+                "status"
+              ]
+            }
+          }
+        },
+        "required": [
+          "accepted",
+          "tournaments"
+        ]
+      },
+      "TournamentCreatedEvent": {
         "type": "object",
         "properties": {
           "id": {
@@ -1764,7 +2512,10 @@
             ]
           },
           "type": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "TournamentCreated"
+            ]
           },
           "producer": {
             "type": "string",
@@ -1795,7 +2546,7 @@
             "nullable": true
           },
           "data": {
-            "type": "object"
+            "$ref": "#/components/schemas/TournamentSnapshot"
           }
         },
         "required": [
@@ -1811,15 +2562,1942 @@
           "data"
         ]
       },
-      "Error": {
+      "TournamentStartedEvent": {
         "type": "object",
         "properties": {
-          "code": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "enum": [
+              1
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "TournamentStarted"
+            ]
+          },
+          "producer": {
+            "type": "string",
+            "enum": [
+              "tournament",
+              "scores",
+              "results",
+              "team",
+              "checking"
+            ]
+          },
+          "tournamentId": {
+            "type": "string"
+          },
+          "gameId": {
+            "type": "string",
+            "nullable": true
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "causationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/TournamentSnapshot"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "type",
+          "producer",
+          "tournamentId",
+          "gameId",
+          "occurredAt",
+          "correlationId",
+          "causationId",
+          "data"
+        ]
+      },
+      "GamesConfiguredEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "enum": [
+              1
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "GamesConfigured"
+            ]
+          },
+          "producer": {
+            "type": "string",
+            "enum": [
+              "tournament",
+              "scores",
+              "results",
+              "team",
+              "checking"
+            ]
+          },
+          "tournamentId": {
+            "type": "string"
+          },
+          "gameId": {
+            "type": "string",
+            "nullable": true
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "causationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Game"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "type",
+          "producer",
+          "tournamentId",
+          "gameId",
+          "occurredAt",
+          "correlationId",
+          "causationId",
+          "data"
+        ]
+      },
+      "TournamentPublishedEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "enum": [
+              1
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "TournamentPublished"
+            ]
+          },
+          "producer": {
+            "type": "string",
+            "enum": [
+              "tournament",
+              "scores",
+              "results",
+              "team",
+              "checking"
+            ]
+          },
+          "tournamentId": {
+            "type": "string"
+          },
+          "gameId": {
+            "type": "string",
+            "nullable": true
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "causationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "data": {
             "type": "string"
           }
         },
         "required": [
-          "code"
+          "id",
+          "version",
+          "type",
+          "producer",
+          "tournamentId",
+          "gameId",
+          "occurredAt",
+          "correlationId",
+          "causationId",
+          "data"
+        ]
+      },
+      "TeamRegisteredEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "enum": [
+              1
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "TeamRegistered"
+            ]
+          },
+          "producer": {
+            "type": "string",
+            "enum": [
+              "tournament",
+              "scores",
+              "results",
+              "team",
+              "checking"
+            ]
+          },
+          "tournamentId": {
+            "type": "string"
+          },
+          "gameId": {
+            "type": "string",
+            "nullable": true
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "causationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/Team"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "type",
+          "producer",
+          "tournamentId",
+          "gameId",
+          "occurredAt",
+          "correlationId",
+          "causationId",
+          "data"
+        ]
+      },
+      "RegistrationRejectedEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "enum": [
+              1
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "RegistrationRejected"
+            ]
+          },
+          "producer": {
+            "type": "string",
+            "enum": [
+              "tournament",
+              "scores",
+              "results",
+              "team",
+              "checking"
+            ]
+          },
+          "tournamentId": {
+            "type": "string"
+          },
+          "gameId": {
+            "type": "string",
+            "nullable": true
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "causationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "teamId": {
+                "type": "string",
+                "nullable": true
+              },
+              "reason": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "teamId",
+              "reason"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "type",
+          "producer",
+          "tournamentId",
+          "gameId",
+          "occurredAt",
+          "correlationId",
+          "causationId",
+          "data"
+        ]
+      },
+      "GameStartedEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "enum": [
+              1
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "GameStarted"
+            ]
+          },
+          "producer": {
+            "type": "string",
+            "enum": [
+              "tournament",
+              "scores",
+              "results",
+              "team",
+              "checking"
+            ]
+          },
+          "tournamentId": {
+            "type": "string"
+          },
+          "gameId": {
+            "type": "string",
+            "nullable": true
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "causationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/Game"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "type",
+          "producer",
+          "tournamentId",
+          "gameId",
+          "occurredAt",
+          "correlationId",
+          "causationId",
+          "data"
+        ]
+      },
+      "SolutionsClosedEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "enum": [
+              1
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "SolutionsClosed"
+            ]
+          },
+          "producer": {
+            "type": "string",
+            "enum": [
+              "tournament",
+              "scores",
+              "results",
+              "team",
+              "checking"
+            ]
+          },
+          "tournamentId": {
+            "type": "string"
+          },
+          "gameId": {
+            "type": "string",
+            "nullable": true
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "causationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "data": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "type",
+          "producer",
+          "tournamentId",
+          "gameId",
+          "occurredAt",
+          "correlationId",
+          "causationId",
+          "data"
+        ]
+      },
+      "AppealsClosedEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "enum": [
+              1
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "AppealsClosed"
+            ]
+          },
+          "producer": {
+            "type": "string",
+            "enum": [
+              "tournament",
+              "scores",
+              "results",
+              "team",
+              "checking"
+            ]
+          },
+          "tournamentId": {
+            "type": "string"
+          },
+          "gameId": {
+            "type": "string",
+            "nullable": true
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "causationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "data": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "type",
+          "producer",
+          "tournamentId",
+          "gameId",
+          "occurredAt",
+          "correlationId",
+          "causationId",
+          "data"
+        ]
+      },
+      "InitialResultsCreatedEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "enum": [
+              1
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "InitialResultsCreated"
+            ]
+          },
+          "producer": {
+            "type": "string",
+            "enum": [
+              "tournament",
+              "scores",
+              "results",
+              "team",
+              "checking"
+            ]
+          },
+          "tournamentId": {
+            "type": "string"
+          },
+          "gameId": {
+            "type": "string",
+            "nullable": true
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "causationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "teams": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "tasks": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "teams",
+              "tasks"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "type",
+          "producer",
+          "tournamentId",
+          "gameId",
+          "occurredAt",
+          "correlationId",
+          "causationId",
+          "data"
+        ]
+      },
+      "SolutionBoundEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "enum": [
+              1
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "SolutionBound"
+            ]
+          },
+          "producer": {
+            "type": "string",
+            "enum": [
+              "tournament",
+              "scores",
+              "results",
+              "team",
+              "checking"
+            ]
+          },
+          "tournamentId": {
+            "type": "string"
+          },
+          "gameId": {
+            "type": "string",
+            "nullable": true
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "causationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/Binding"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "type",
+          "producer",
+          "tournamentId",
+          "gameId",
+          "occurredAt",
+          "correlationId",
+          "causationId",
+          "data"
+        ]
+      },
+      "VerdictRecordedEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "enum": [
+              1
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "VerdictRecorded"
+            ]
+          },
+          "producer": {
+            "type": "string",
+            "enum": [
+              "tournament",
+              "scores",
+              "results",
+              "team",
+              "checking"
+            ]
+          },
+          "tournamentId": {
+            "type": "string"
+          },
+          "gameId": {
+            "type": "string",
+            "nullable": true
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "causationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/Verdict"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "type",
+          "producer",
+          "tournamentId",
+          "gameId",
+          "occurredAt",
+          "correlationId",
+          "causationId",
+          "data"
+        ]
+      },
+      "TeamSealedEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "enum": [
+              1
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "TeamSealed"
+            ]
+          },
+          "producer": {
+            "type": "string",
+            "enum": [
+              "tournament",
+              "scores",
+              "results",
+              "team",
+              "checking"
+            ]
+          },
+          "tournamentId": {
+            "type": "string"
+          },
+          "gameId": {
+            "type": "string",
+            "nullable": true
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "causationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/TeamSeal"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "type",
+          "producer",
+          "tournamentId",
+          "gameId",
+          "occurredAt",
+          "correlationId",
+          "causationId",
+          "data"
+        ]
+      },
+      "ChecksSealedEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "enum": [
+              1
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "ChecksSealed"
+            ]
+          },
+          "producer": {
+            "type": "string",
+            "enum": [
+              "tournament",
+              "scores",
+              "results",
+              "team",
+              "checking"
+            ]
+          },
+          "tournamentId": {
+            "type": "string"
+          },
+          "gameId": {
+            "type": "string",
+            "nullable": true
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "causationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/CheckSeal"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "type",
+          "producer",
+          "tournamentId",
+          "gameId",
+          "occurredAt",
+          "correlationId",
+          "causationId",
+          "data"
+        ]
+      },
+      "ScoreChangedEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "enum": [
+              1
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "ScoreChanged"
+            ]
+          },
+          "producer": {
+            "type": "string",
+            "enum": [
+              "tournament",
+              "scores",
+              "results",
+              "team",
+              "checking"
+            ]
+          },
+          "tournamentId": {
+            "type": "string"
+          },
+          "gameId": {
+            "type": "string",
+            "nullable": true
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "causationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/ScoreChange"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "type",
+          "producer",
+          "tournamentId",
+          "gameId",
+          "occurredAt",
+          "correlationId",
+          "causationId",
+          "data"
+        ]
+      },
+      "AppealScoreChangedEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "enum": [
+              1
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "AppealScoreChanged"
+            ]
+          },
+          "producer": {
+            "type": "string",
+            "enum": [
+              "tournament",
+              "scores",
+              "results",
+              "team",
+              "checking"
+            ]
+          },
+          "tournamentId": {
+            "type": "string"
+          },
+          "gameId": {
+            "type": "string",
+            "nullable": true
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "causationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/ScoreChange"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "type",
+          "producer",
+          "tournamentId",
+          "gameId",
+          "occurredAt",
+          "correlationId",
+          "causationId",
+          "data"
+        ]
+      },
+      "ScoresReadyEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "enum": [
+              1
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "ScoresReady"
+            ]
+          },
+          "producer": {
+            "type": "string",
+            "enum": [
+              "tournament",
+              "scores",
+              "results",
+              "team",
+              "checking"
+            ]
+          },
+          "tournamentId": {
+            "type": "string"
+          },
+          "gameId": {
+            "type": "string",
+            "nullable": true
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "causationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/ScoreSnapshot"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "type",
+          "producer",
+          "tournamentId",
+          "gameId",
+          "occurredAt",
+          "correlationId",
+          "causationId",
+          "data"
+        ]
+      },
+      "GameFinalizedEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "enum": [
+              1
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "GameFinalized"
+            ]
+          },
+          "producer": {
+            "type": "string",
+            "enum": [
+              "tournament",
+              "scores",
+              "results",
+              "team",
+              "checking"
+            ]
+          },
+          "tournamentId": {
+            "type": "string"
+          },
+          "gameId": {
+            "type": "string",
+            "nullable": true
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "causationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Standing"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "type",
+          "producer",
+          "tournamentId",
+          "gameId",
+          "occurredAt",
+          "correlationId",
+          "causationId",
+          "data"
+        ]
+      },
+      "TournamentPointsUpdatedEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "enum": [
+              1
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "TournamentPointsUpdated"
+            ]
+          },
+          "producer": {
+            "type": "string",
+            "enum": [
+              "tournament",
+              "scores",
+              "results",
+              "team",
+              "checking"
+            ]
+          },
+          "tournamentId": {
+            "type": "string"
+          },
+          "gameId": {
+            "type": "string",
+            "nullable": true
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "causationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Standing"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "type",
+          "producer",
+          "tournamentId",
+          "gameId",
+          "occurredAt",
+          "correlationId",
+          "causationId",
+          "data"
+        ]
+      },
+      "WinnerDeterminedEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "enum": [
+              1
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "WinnerDetermined"
+            ]
+          },
+          "producer": {
+            "type": "string",
+            "enum": [
+              "tournament",
+              "scores",
+              "results",
+              "team",
+              "checking"
+            ]
+          },
+          "tournamentId": {
+            "type": "string"
+          },
+          "gameId": {
+            "type": "string",
+            "nullable": true
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "causationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Standing"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "type",
+          "producer",
+          "tournamentId",
+          "gameId",
+          "occurredAt",
+          "correlationId",
+          "causationId",
+          "data"
+        ]
+      },
+      "TournamentCompletedEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "enum": [
+              1
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "TournamentCompleted"
+            ]
+          },
+          "producer": {
+            "type": "string",
+            "enum": [
+              "tournament",
+              "scores",
+              "results",
+              "team",
+              "checking"
+            ]
+          },
+          "tournamentId": {
+            "type": "string"
+          },
+          "gameId": {
+            "type": "string",
+            "nullable": true
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "causationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Standing"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "type",
+          "producer",
+          "tournamentId",
+          "gameId",
+          "occurredAt",
+          "correlationId",
+          "causationId",
+          "data"
+        ]
+      },
+      "ReserveScoreboardEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "enum": [
+              1
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "ReserveScoreboard"
+            ]
+          },
+          "producer": {
+            "type": "string",
+            "enum": [
+              "tournament",
+              "scores",
+              "results",
+              "team",
+              "checking"
+            ]
+          },
+          "tournamentId": {
+            "type": "string"
+          },
+          "gameId": {
+            "type": "string",
+            "nullable": true
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "causationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/PreparationRequest"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "type",
+          "producer",
+          "tournamentId",
+          "gameId",
+          "occurredAt",
+          "correlationId",
+          "causationId",
+          "data"
+        ]
+      },
+      "ReserveFormsEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "enum": [
+              1
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "ReserveForms"
+            ]
+          },
+          "producer": {
+            "type": "string",
+            "enum": [
+              "tournament",
+              "scores",
+              "results",
+              "team",
+              "checking"
+            ]
+          },
+          "tournamentId": {
+            "type": "string"
+          },
+          "gameId": {
+            "type": "string",
+            "nullable": true
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "causationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/PreparationRequest"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "type",
+          "producer",
+          "tournamentId",
+          "gameId",
+          "occurredAt",
+          "correlationId",
+          "causationId",
+          "data"
+        ]
+      },
+      "ReleaseScoreboardEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "enum": [
+              1
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "ReleaseScoreboard"
+            ]
+          },
+          "producer": {
+            "type": "string",
+            "enum": [
+              "tournament",
+              "scores",
+              "results",
+              "team",
+              "checking"
+            ]
+          },
+          "tournamentId": {
+            "type": "string"
+          },
+          "gameId": {
+            "type": "string",
+            "nullable": true
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "causationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/PreparationReply"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "type",
+          "producer",
+          "tournamentId",
+          "gameId",
+          "occurredAt",
+          "correlationId",
+          "causationId",
+          "data"
+        ]
+      },
+      "ReleaseFormsEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "enum": [
+              1
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "ReleaseForms"
+            ]
+          },
+          "producer": {
+            "type": "string",
+            "enum": [
+              "tournament",
+              "scores",
+              "results",
+              "team",
+              "checking"
+            ]
+          },
+          "tournamentId": {
+            "type": "string"
+          },
+          "gameId": {
+            "type": "string",
+            "nullable": true
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "causationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/PreparationReply"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "type",
+          "producer",
+          "tournamentId",
+          "gameId",
+          "occurredAt",
+          "correlationId",
+          "causationId",
+          "data"
+        ]
+      },
+      "ScoreboardReservedEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "enum": [
+              1
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "ScoreboardReserved"
+            ]
+          },
+          "producer": {
+            "type": "string",
+            "enum": [
+              "tournament",
+              "scores",
+              "results",
+              "team",
+              "checking"
+            ]
+          },
+          "tournamentId": {
+            "type": "string"
+          },
+          "gameId": {
+            "type": "string",
+            "nullable": true
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "causationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/PreparationReply"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "type",
+          "producer",
+          "tournamentId",
+          "gameId",
+          "occurredAt",
+          "correlationId",
+          "causationId",
+          "data"
+        ]
+      },
+      "FormsReservedEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "enum": [
+              1
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "FormsReserved"
+            ]
+          },
+          "producer": {
+            "type": "string",
+            "enum": [
+              "tournament",
+              "scores",
+              "results",
+              "team",
+              "checking"
+            ]
+          },
+          "tournamentId": {
+            "type": "string"
+          },
+          "gameId": {
+            "type": "string",
+            "nullable": true
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "causationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/PreparationReply"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "type",
+          "producer",
+          "tournamentId",
+          "gameId",
+          "occurredAt",
+          "correlationId",
+          "causationId",
+          "data"
+        ]
+      },
+      "ScoreboardReleasedEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "enum": [
+              1
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "ScoreboardReleased"
+            ]
+          },
+          "producer": {
+            "type": "string",
+            "enum": [
+              "tournament",
+              "scores",
+              "results",
+              "team",
+              "checking"
+            ]
+          },
+          "tournamentId": {
+            "type": "string"
+          },
+          "gameId": {
+            "type": "string",
+            "nullable": true
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "causationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/PreparationReply"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "type",
+          "producer",
+          "tournamentId",
+          "gameId",
+          "occurredAt",
+          "correlationId",
+          "causationId",
+          "data"
+        ]
+      },
+      "FormsReleasedEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "enum": [
+              1
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "FormsReleased"
+            ]
+          },
+          "producer": {
+            "type": "string",
+            "enum": [
+              "tournament",
+              "scores",
+              "results",
+              "team",
+              "checking"
+            ]
+          },
+          "tournamentId": {
+            "type": "string"
+          },
+          "gameId": {
+            "type": "string",
+            "nullable": true
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "causationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/PreparationReply"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "type",
+          "producer",
+          "tournamentId",
+          "gameId",
+          "occurredAt",
+          "correlationId",
+          "causationId",
+          "data"
+        ]
+      },
+      "ScoreboardPreparationRejectedEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "enum": [
+              1
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "ScoreboardPreparationRejected"
+            ]
+          },
+          "producer": {
+            "type": "string",
+            "enum": [
+              "tournament",
+              "scores",
+              "results",
+              "team",
+              "checking"
+            ]
+          },
+          "tournamentId": {
+            "type": "string"
+          },
+          "gameId": {
+            "type": "string",
+            "nullable": true
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "causationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/PreparationReply"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "type",
+          "producer",
+          "tournamentId",
+          "gameId",
+          "occurredAt",
+          "correlationId",
+          "causationId",
+          "data"
+        ]
+      },
+      "FormsPreparationRejectedEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "enum": [
+              1
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "FormsPreparationRejected"
+            ]
+          },
+          "producer": {
+            "type": "string",
+            "enum": [
+              "tournament",
+              "scores",
+              "results",
+              "team",
+              "checking"
+            ]
+          },
+          "tournamentId": {
+            "type": "string"
+          },
+          "gameId": {
+            "type": "string",
+            "nullable": true
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "causationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/PreparationReply"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "type",
+          "producer",
+          "tournamentId",
+          "gameId",
+          "occurredAt",
+          "correlationId",
+          "causationId",
+          "data"
         ]
       }
     },

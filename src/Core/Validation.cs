@@ -35,6 +35,11 @@ public static class Validation
         {
             switch (e.Type)
             {
+                case "ReserveScoreboard": case "ReserveForms":
+                    var prepare=e.Body<PreparationRequest>();Game(prepare.Config);
+                    Require.That(Text(prepare.AttemptId)&&prepare.TeamIds is {Count:>0}&&prepare.TeamIds.All(Text),"invalid_event_payload",400);break;
+                case "ReleaseScoreboard": case "ReleaseForms": case "ScoreboardReserved": case "FormsReserved": case "ScoreboardPreparationRejected": case "FormsPreparationRejected": case "ScoreboardReleased": case "FormsReleased":
+                    Require.That(Text(e.Body<PreparationReply>().AttemptId),"invalid_event_payload",400);break;
                 case "TournamentStarted":
                     var t = e.Body<Tournament>(); Tournament(t);
                     Require.That(t.Id == e.TournamentId && t.Teams is { Count: >= 2 } && t.Games is { Count: > 0 }, "invalid_event_payload", 400);

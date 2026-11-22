@@ -49,7 +49,7 @@ try:
     browser=Browser(next(t for t in tabs if t['type']=='page')['webSocketDebuggerUrl'])
     browser.call('Runtime.enable');browser.call('Page.enable')
     browser.call('Emulation.setDeviceMetricsOverride',{'width':1440,'height':1080,'deviceScaleFactor':1,'mobile':False})
-    browser.call('Page.navigate',{'url':'http://localhost:5102/'})
+    browser.call('Page.navigate',{'url':os.environ.get('MATH_UI_URL','http://localhost:5102/')})
     browser.wait('typeof state !== "undefined" && document.querySelector("#demo-button")')
     browser.wait('state.list.length || document.querySelector(".empty-start")')
     # Run the entire tournament from the UI, including explicitly entering the demo account.

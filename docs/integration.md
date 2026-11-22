@@ -34,3 +34,20 @@ TournamentStarted → подготовить бланки всех игр; хр�
 ChecksSealed создаётся только после закрытия обоих приёмов, получения полного TeamSealed, завершения каждой первичной проверки и каждой поданной апелляции (включая эскалированные). Включает IDs всех опубликованных VerdictRecorded. После seal запрещено создавать новые принятые решения/апелляции/вердикты. Решение о закрытии нельзя основывать только на текущем пустом списке проверок: необходимо знать полный манифест принятых решений team.
 
 Имитатор `POST /fixtures/{tournament}/{game}`, bearer simulator-demo: создаёт сохраняемый набор Binding/вердиктов/двух seal, отправляет в обратном порядке, повторяет те же IDs при повторном вызове. Это исключительно тестовый API. Он не предоставляет интерфейс судьи и не имитирует проверку прав, сканирование QR или реальную подачу апелляции.
+
+
+## Подготовка игры v1
+
+| Команда/событие | Отправитель → получатель | Data |
+|---|---|---|
+| ReserveScoreboard | tournament → scores | PreparationRequest(attemptId, config, teamIds) |
+| ScoreboardReserved / ScoreboardPreparationRejected | scores → tournament | PreparationReply(attemptId, reason?) |
+| ReserveForms | tournament → simulator | PreparationRequest |
+| FormsReserved / FormsPreparationRejected | simulator → tournament | PreparationReply |
+| ReleaseScoreboard / ReleaseForms | tournament → соответствующий участник | PreparationReply |
+| ScoreboardReleased / FormsReleased | соответствующий участник → tournament | PreparationReply |
+| GameStarted | tournament → scores/results/simulator | Game, включая preparationAttemptId и абсолютные сроки |
+
+ID конверта неизменяем при транспортном повторе. attemptId идентифицирует попытку, causationId связывает ответ с командой. Producer simulator имеет отдельный KEY_SIMULATOR; это не судейский интерфейс. Баллы и имитатор резервируют только собственные данные. Резерв не создаёт активных ячеек таблицы и не выдаёт бланки. После GameStarted он Activated. Released — сохраняемый запрет повторного резервирования этой попытки. Ответ старой попытки после Compensated/Succeeded игнорируется; ни её поздний успех, ни повтор компенсации не изменяет новую попытку. До обоих Released координатор не разрешает повтор.
+
+Управляемые сбои: только ENABLE_LAB_DEMOS=1. POST /lab/reject-next-forms имитатора требует SIMULATOR_KEY; UI-шлюз требует организатора. POST /lab/delivery/{destination}/{pause|resume} требует организатора (у имитатора — SIMULATOR_KEY). GET /lab/reservations имитатора тоже закрыт ключом. Пауза означает удержание событий в outbox, без подмены результатов и без чтения чужой БД. Обычный запуск Host напрямую по умолчанию не включает эти маршруты.

@@ -44,6 +44,39 @@ for suffix in ('publish','start','games/{game}/start'):operation('/tournaments/{
 operation('/tournaments/{id}/table','get','Scores/results service: live table and final standings')
 operation('/tournaments/{id}/stream','get','Scores/results service: SSE snapshots, reconnect fetches latest state')
 operation('/ui-api/fixtures/{id}/{game}','post','UI: organizer invokes test simulator for the selected game',auth=True)
-document={'openapi':'3.0.3','info':{'title':'Math Tournament services','version':'1.0.0'},'servers':[{'url':f'http://localhost:{port}','description':name} for port,name in [(5101,'Tournament'),(5102,'Scores'),(5103,'Results')]],'paths':paths,'components':{'schemas':schemas,'securitySchemes':{'bearer':{'type':'http','scheme':'bearer'}}}}
+# Concrete v1 event payloads; strings and arrays are valid payloads too.
+schemas['Game']=obj({'config':ref('GameConfig'),'status':string(),'solutionsDue':{'type':'string','format':'date-time','nullable':True},'appealsDue':{'type':'string','format':'date-time','nullable':True},'solutionsClosed':{'type':'boolean'},'appealsClosed':{'type':'boolean'},'preparationAttemptId':{'type':'string','nullable':True},'preparationStatus':{'type':'string','nullable':True},'preparationFailure':{'type':'string','nullable':True}},['config','status'])
+schemas['TournamentSnapshot']=obj({**schemas['Tournament']['properties'],'organizer':string(),'revision':{'type':'integer','format':'int64'},'status':string(),'teams':arr(ref('Team')),'games':arr(ref('Game'))})
+schemas['PreparationRequest']=obj({'attemptId':string(),'config':ref('GameConfig'),'teamIds':arr(string())})
+schemas['PreparationReply']=obj({'attemptId':string(),'reason':{'type':'string','nullable':True}},['attemptId'])
+schemas['ScoreChange']=obj({'teamId':string(),'taskId':string(),'status':string(),'points':{'type':'number'},'gameTotal':{'type':'number'}})
+schemas['CommandResponse']=obj({'accepted':{'type':'boolean'},'tournaments':arr(obj({'id':string(),'revision':{'type':'integer','format':'int64'},'status':string()}))})
+envelope=schemas['Event']['properties']
+payloads={
+ 'TournamentCreated':ref('TournamentSnapshot'),'TournamentStarted':ref('TournamentSnapshot'),'GamesConfigured':arr(ref('Game')),
+ 'TournamentPublished':string(),'TeamRegistered':ref('Team'),'RegistrationRejected':obj({'teamId':{'type':'string','nullable':True},'reason':string()}),
+ 'GameStarted':ref('Game'),'SolutionsClosed':{'type':'string','format':'date-time'},'AppealsClosed':{'type':'string','format':'date-time'},
+ 'InitialResultsCreated':obj({'teams':arr(string()),'tasks':arr(string())}),
+ 'SolutionBound':ref('Binding'),'VerdictRecorded':ref('Verdict'),'TeamSealed':ref('TeamSeal'),'ChecksSealed':ref('CheckSeal'),
+ 'ScoreChanged':ref('ScoreChange'),'AppealScoreChanged':ref('ScoreChange'),'ScoresReady':ref('ScoreSnapshot'),
+ 'GameFinalized':arr(ref('Standing')),'TournamentPointsUpdated':arr(ref('Standing')),'WinnerDetermined':arr(ref('Standing')),'TournamentCompleted':arr(ref('Standing'))}
+for kind in ['ReserveScoreboard','ReserveForms']:payloads[kind]=ref('PreparationRequest')
+for kind in ['ReleaseScoreboard','ReleaseForms','ScoreboardReserved','FormsReserved','ScoreboardReleased','FormsReleased','ScoreboardPreparationRejected','FormsPreparationRejected']:payloads[kind]=ref('PreparationReply')
+mapping={}
+for kind,payload in payloads.items():
+ name=kind+'Event';mapping[kind]='#/components/schemas/'+name
+ schemas[name]=obj({**envelope,'type':{'type':'string','enum':[kind]},'data':payload})
+schemas['Event']={'oneOf':[{'$ref':value} for value in mapping.values()],'discriminator':{'propertyName':'type','mapping':mapping}}
+operation('/lab/status','get','Local educational controls availability')
+operation('/lab/delivery/{destination}/{action}','post','Local demo only: pause/resume a recipient; organizer token or simulator key',auth=True)
+operation('/lab/reject-next-forms','post','Simulator local demo only: reject the next form reservation',auth=True)
+operation('/lab/reservations','get','Simulator local demo only: inspect local form reservations',auth=True)
+operation('/ui-api/lab/reject-next-forms','post','UI local demo: arm the form rejection; organizer only',auth=True)
+# All mutation responses have the same persisted command receipt shape.
+for path,methods in paths.items():
+ if path.startswith('/tournaments'):
+  for method,op in methods.items():
+   if method in ('post','put','delete'):op['responses']['200']['content']['application/json']['schema']=ref('CommandResponse')
+document={'openapi':'3.0.3','info':{'title':'Math Tournament services','version':'1.0.0'},'servers':[{'url':f'http://localhost:{port}','description':name} for port,name in [(5101,'Tournament'),(5102,'Scores'),(5103,'Results'),(5104,'Simulator')]],'paths':paths,'components':{'schemas':schemas,'securitySchemes':{'bearer':{'type':'http','scheme':'bearer'}}}}
 destination=Path(__file__).parent.parent/'docs/openapi.json'
 destination.write_text(json.dumps(document,ensure_ascii=False,indent=2),encoding='utf-8')

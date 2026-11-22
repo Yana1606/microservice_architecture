@@ -4,6 +4,17 @@ using Xunit;
 namespace Tests;
 public class CacheTests
 {
+    [Theory][InlineData("Correct",10)][InlineData("Incorrect",0)]
+    public void RealVerdictEventInvalidatesEvenWhenOnlyStatusChanges(string outcome,int points)
+    {
+        var flow=new SagaTests.Flow();var request=flow.ReserveFirst();flow.Forms.Receive(flow.F,request);flow.Coordinator.Receive(flow.T,flow.Forms.Events.Last());flow.Scores.Receive(flow.S,flow.Coordinator.Events.Last());
+        var store=new Store(Path.Combine(Path.GetTempPath(),Guid.NewGuid()+".db"),"scores");
+        store.Update((s,_)=>{s.Tournaments=flow.S.Tournaments;s.Scores=flow.S.Scores;s.Reservations=flow.S.Reservations;});
+        using var memory=new MemoryCache(new MemoryCacheOptions());using var cache=new TableSnapshotCache(store,memory);
+        var before=cache.Get("t");store.Update((s,e)=>e.Receive(s,Event.Create("SolutionBound","team","t","g",new Binding("anon","a","q","normal"))));
+        store.Update((s,e)=>e.Receive(s,Event.Create("VerdictRecorded","checking","t","g",new Verdict("anon",1,outcome,"j","Jury"))));
+        var after=cache.Get("t");Assert.NotEqual(before,after);Assert.Contains("\"status\":\""+outcome+"\"",after);Assert.Contains("\"points\":"+points,after);
+    }
     [Fact]public void CacheHitsInvalidatesAfterCommitAndSeparatesTournaments()
     {
         var store=new Store(Path.Combine(Path.GetTempPath(),Guid.NewGuid()+".db"),"scores");

@@ -9,6 +9,7 @@ x-common: &common
     PEER_RESULTS: http://results:8080
     PEER_SIMULATOR: http://simulator:8080
     DB: /data/service.db
+    ENABLE_LAB_DEMOS: "1"
 services:
   tournament:
     <<: *common
@@ -17,6 +18,12 @@ services:
       SERVICE: tournament
     ports: ["127.0.0.1:5101:8080"]
     volumes: ["tournament:/data"]
+    healthcheck:
+      test: ["CMD", "dotnet", "host/Host.dll", "--healthcheck"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
   scores:
     <<: *common
     environment:
@@ -24,6 +31,12 @@ services:
       SERVICE: scores
     ports: ["127.0.0.1:5102:8080"]
     volumes: ["scores:/data"]
+    healthcheck:
+      test: ["CMD", "dotnet", "host/Host.dll", "--healthcheck"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
   results:
     <<: *common
     environment:
@@ -31,6 +44,12 @@ services:
       SERVICE: results
     ports: ["127.0.0.1:5103:8080"]
     volumes: ["results:/data"]
+    healthcheck:
+      test: ["CMD", "dotnet", "host/Host.dll", "--healthcheck"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
   simulator:
     <<: *common
     command: ["simulator/Simulator.dll"]
@@ -39,6 +58,12 @@ services:
       SCORES_URL: http://scores:8080
     ports: ["127.0.0.1:5104:8080"]
     volumes: ["simulator:/data"]
+    healthcheck:
+      test: ["CMD", "dotnet", "simulator/Simulator.dll", "--healthcheck"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
   tests:
     image: mcr.microsoft.com/dotnet/sdk:8.0
     profiles: ["test"]
