@@ -56,6 +56,63 @@ public class ReliabilityTests
         var upgraded=new Store(path,"tournament");Assert.Single(upgraded.Pending(DateTimeOffset.UtcNow));
         Assert.Single(new Store(path,"tournament").Pending());
     }
+
+    [Fact] public async Task Permanent400IsDeadLetteredAndDoesNotBlockFollowingDelivery()
+    {
+        var path = Database(); var store = new Store(path, "tournament");
+        using (var c = new SqliteConnection("Data Source=" + path))
+        {
+            c.Open(); Insert(c, "poison", "online"); Insert(c, "following", "online");
+        }
+        var sent = new List<string>();
+        using var http = new HttpClient(new Handler((request, _) =>
+        {
+            var body = request.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
+            var id = System.Text.Json.JsonDocument.Parse(body).RootElement.GetProperty("id").GetString()!;
+            sent.Add(id);
+            return Task.FromResult(new System.Net.Http.HttpResponseMessage(
+                id == "poison" ? System.Net.HttpStatusCode.BadRequest : System.Net.HttpStatusCode.Accepted));
+        }));
+        await new DeliveryDispatcher(store, http, _ => "http://online", "test").DispatchAsync();
+        Assert.Equal(new[] { "poison", "following" }, sent);
+        Assert.Equal(1, store.DeadLetterCount());
+        Assert.Equal(0, store.PendingCount());
+        Assert.Equal("poison", Assert.Single(store.DeadLetters()).EventId);
+    }
+
+    [Fact] public async Task ServiceUnavailableIsRetriedAndStopsCurrentRecipientBatch()
+    {
+        var path = Database(); var store = new Store(path, "tournament");
+        using (var c = new SqliteConnection("Data Source=" + path))
+        {
+            c.Open(); Insert(c, "first", "online"); Insert(c, "second", "online");
+        }
+        var sends = 0;
+        using var http = new HttpClient(new Handler((_, _) =>
+        {
+            sends++;
+            return Task.FromResult(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.ServiceUnavailable));
+        }));
+        await new DeliveryDispatcher(store, http, _ => "http://online", "test").DispatchAsync();
+        Assert.Equal(1, sends);
+        Assert.Equal(2, store.PendingCount());
+        Assert.Equal(0, store.DeadLetterCount());
+    }
+
+    [Fact] public void DeadLetterSurvivesRestartAndCanBeRequeued()
+    {
+        var path = Database(); var store = new Store(path, "tournament");
+        using (var c = new SqliteConnection("Data Source=" + path)) { c.Open(); Insert(c, "poison", "online"); }
+        var delivery = Assert.Single(store.Pending());
+        store.MoveToDeadLetter(delivery, "HTTP 400 Bad Request");
+        var restarted = new Store(path, "tournament");
+        Assert.Equal("poison", Assert.Single(restarted.DeadLetters()).EventId);
+        Assert.Empty(restarted.Pending());
+        restarted.RequeueDeadLetter("poison", "online");
+        Assert.Contains(restarted.Pending(), d => d.Event.Id == "poison");
+        Assert.Equal(0, restarted.DeadLetterCount());
+    }
+
     [Theory][InlineData("jury")][InlineData("id")][InlineData("senior")]
     public void NullTournamentFieldsProduceDomainError(string field)
     {
@@ -81,7 +138,8 @@ public class ReliabilityTests
     {
         using var command=c.CreateCommand();command.CommandText="INSERT INTO outbox(id,destination,json) VALUES($id,$dest,$json)";
         command.Parameters.AddWithValue("$id",id);command.Parameters.AddWithValue("$dest",destination);
-        command.Parameters.AddWithValue("$json",Json.Write(Event.Create("Test","tournament","t",null,new{})));command.ExecuteNonQuery();
+        var e = Event.Create("Test","tournament","t",null,new{}) with { Id = id };
+        command.Parameters.AddWithValue("$json",Json.Write(e));command.ExecuteNonQuery();
     }
     [Fact] public void SemanticRepeatWithNewEventIdDoesNotBlockSealedFinalization()
     {

@@ -110,7 +110,24 @@ app.MapPost("/internal/events", (Event e, HttpRequest r) =>
 app.MapGet("/internal/diagnostics", (HttpRequest r) =>
 {
     Actor(r, "organizer"); var s = store.Read();
-    return Results.Ok(new { pending = s.Pending.Keys, s.Quarantine, preparations=s.Preparations.Values,reservations=s.Reservations.Values,pausedDestinations=s.PausedDestinations, cache=app.Services.GetRequiredService<TableSnapshotCache>().Statistics,outboxPending = store.PendingCount() });
+    return Results.Ok(new
+    {
+        pending = s.Pending.Keys, s.Quarantine, preparations = s.Preparations.Values,
+        reservations = s.Reservations.Values, pausedDestinations = s.PausedDestinations,
+        cache = app.Services.GetRequiredService<TableSnapshotCache>().Statistics,
+        outboxPending = store.PendingCount(), outboxDeadLetter = store.DeadLetterCount()
+    });
+});
+app.MapGet("/internal/outbox/dead-letter", (HttpRequest r) =>
+{
+    Actor(r, "organizer");
+    return Results.Ok(new { items = store.DeadLetters() });
+});
+app.MapPost("/internal/outbox/dead-letter/{eventId}/{destination}/retry", (string eventId, string destination, HttpRequest r) =>
+{
+    Actor(r, "organizer");
+    store.RequeueDeadLetter(eventId, destination);
+    return Results.Ok(new { requeued = true, eventId, destination });
 });
 if (service == "tournament")
 {

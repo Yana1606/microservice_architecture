@@ -25,8 +25,11 @@ public sealed class Store
             migration.CommandText = ReadMigration("002_delivery_retry.sql"); migration.ExecuteNonQuery();
         }
         migration.CommandText=ReadMigration("003_public_snapshots.sql");migration.ExecuteNonQuery();
-        migration.CommandText = "SELECT MAX(version) FROM schema_version";
-        if (Convert.ToInt32(migration.ExecuteScalar()) < 4)
+        // Check the exact migration marker, not MAX(version): later independent schema
+        // additions must never make us skip the legacy game-key migration.
+        migration.Parameters.Clear();
+        migration.CommandText = "SELECT COUNT(*) FROM schema_version WHERE version=4";
+        if (Convert.ToInt32(migration.ExecuteScalar()) == 0)
         {
             migration.CommandText = "SELECT json FROM state WHERE id=1";
             var state = Json.Read<State>((string)migration.ExecuteScalar()!);
@@ -36,8 +39,43 @@ public sealed class Store
             migration.Parameters.Clear();
             migration.CommandText = ReadMigration("004_game_keys.sql"); migration.ExecuteNonQuery();
         }
+
+        // The outbox extension is deliberately tracked separately from the ordered
+        // legacy schema_version sequence. This keeps a v3 database genuinely v3 when
+        // the v4 data migration fails and rolls back (including ambiguous legacy keys).
+        EnsureDeadLetterColumns(migration);
+        migration.Parameters.Clear();
+        migration.CommandText = ReadMigration("005_outbox_dead_letter.sql");
+        migration.ExecuteNonQuery();
         tx.Commit();
     }
+    private static void EnsureDeadLetterColumns(SqliteCommand command)
+    {
+        var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        command.Parameters.Clear();
+        command.CommandText = "PRAGMA table_info(outbox)";
+        using (var reader = command.ExecuteReader())
+        {
+            while (reader.Read()) columns.Add(reader.GetString(1));
+        }
+        command.Parameters.Clear();
+        if (!columns.Contains("dead_lettered"))
+        {
+            command.CommandText = "ALTER TABLE outbox ADD COLUMN dead_lettered INTEGER NOT NULL DEFAULT 0";
+            command.ExecuteNonQuery();
+        }
+        if (!columns.Contains("dead_lettered_ms"))
+        {
+            command.CommandText = "ALTER TABLE outbox ADD COLUMN dead_lettered_ms INTEGER";
+            command.ExecuteNonQuery();
+        }
+        if (!columns.Contains("dead_letter_reason"))
+        {
+            command.CommandText = "ALTER TABLE outbox ADD COLUMN dead_letter_reason TEXT";
+            command.ExecuteNonQuery();
+        }
+    }
+
     private static void UpgradeGameKeys(State state)
     {
         var keys = state.Tournaments.Values.SelectMany(t => t.Games.Select(g =>
@@ -164,7 +202,7 @@ public sealed class Store
             SELECT json,destination FROM (
               SELECT json,destination,rowid AS position,
                 ROW_NUMBER() OVER(PARTITION BY destination ORDER BY rowid) AS destination_row
-              FROM outbox WHERE sent=0 AND ($due IS NULL OR next_attempt_ms <= $due)
+              FROM outbox WHERE sent=0 AND dead_lettered=0 AND ($due IS NULL OR next_attempt_ms <= $due)
             ) WHERE destination_row <= $limit ORDER BY destination,position
             """;
         q.Parameters.AddWithValue("$due", (object?)dueAt?.ToUnixTimeMilliseconds() ?? DBNull.Value);
@@ -174,8 +212,58 @@ public sealed class Store
     }
     public long PendingCount()
     {
-        using var c = Open(); using var q = c.CreateCommand(); q.CommandText = "SELECT COUNT(*) FROM outbox WHERE sent=0";
+        using var c = Open(); using var q = c.CreateCommand();
+        q.CommandText = "SELECT COUNT(*) FROM outbox WHERE sent=0 AND dead_lettered=0";
         return (long)q.ExecuteScalar()!;
+    }
+    public long DeadLetterCount()
+    {
+        using var c = Open(); using var q = c.CreateCommand();
+        q.CommandText = "SELECT COUNT(*) FROM outbox WHERE dead_lettered=1";
+        return (long)q.ExecuteScalar()!;
+    }
+    public List<OutboxDeadLetter> DeadLetters(int limit = 100)
+    {
+        Require.That(limit is >= 1 and <= 500, "invalid_dead_letter_limit", 400);
+        using var c = Open(); using var q = c.CreateCommand();
+        q.CommandText = """
+            SELECT id,destination,dead_letter_reason,dead_lettered_ms,attempts
+            FROM outbox WHERE dead_lettered=1
+            ORDER BY dead_lettered_ms DESC,id,destination LIMIT $limit
+            """;
+        q.Parameters.AddWithValue("$limit", limit);
+        using var r = q.ExecuteReader(); var rows = new List<OutboxDeadLetter>();
+        while (r.Read())
+        {
+            rows.Add(new OutboxDeadLetter(r.GetString(0), r.GetString(1), r.GetString(2),
+                DateTimeOffset.FromUnixTimeMilliseconds(r.GetInt64(3)), r.GetInt32(4)));
+        }
+        return rows;
+    }
+    public void MoveToDeadLetter(Delivery d, string reason, DateTimeOffset? now = null)
+    {
+        Require.That(!string.IsNullOrWhiteSpace(reason), "dead_letter_reason_required", 400);
+        using var c = Open(); using var q = c.CreateCommand();
+        q.CommandText = """
+            UPDATE outbox SET dead_lettered=1,dead_lettered_ms=$now,dead_letter_reason=$reason,
+              attempts=attempts+1,last_error=$reason,next_attempt_ms=0
+            WHERE id=$id AND destination=$dest AND sent=0 AND dead_lettered=0
+            """;
+        q.Parameters.AddWithValue("$now", (now ?? DateTimeOffset.UtcNow).ToUnixTimeMilliseconds());
+        q.Parameters.AddWithValue("$reason", reason.Length > 1000 ? reason[..1000] : reason);
+        q.Parameters.AddWithValue("$id", d.Event.Id); q.Parameters.AddWithValue("$dest", d.Destination);
+        q.ExecuteNonQuery();
+    }
+    public void RequeueDeadLetter(string eventId, string destination)
+    {
+        using var c = Open(); using var q = c.CreateCommand();
+        q.CommandText = """
+            UPDATE outbox SET dead_lettered=0,dead_lettered_ms=NULL,dead_letter_reason=NULL,
+              next_attempt_ms=0,last_error=NULL
+            WHERE id=$id AND destination=$dest AND sent=0 AND dead_lettered=1
+            """;
+        q.Parameters.AddWithValue("$id", eventId); q.Parameters.AddWithValue("$dest", destination);
+        Require.That(q.ExecuteNonQuery() == 1, "dead_letter_not_found", 404);
     }
     public void Delivered(Delivery d, string? error = null, DateTimeOffset? now = null)
     {
@@ -190,3 +278,6 @@ public sealed class Store
         q.Parameters.AddWithValue("$id", d.Event.Id); q.Parameters.AddWithValue("$dest", d.Destination); q.ExecuteNonQuery();
     }
 }
+
+public sealed record OutboxDeadLetter(string EventId, string Destination, string Reason, DateTimeOffset DeadLetteredAt, int Attempts);
+
