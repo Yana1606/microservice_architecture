@@ -1,0 +1,12 @@
+**/bin/
+**/obj/
+data/
+logs/
+test-results/
+
+**/__pycache__/
+*.db
+*.db-wal
+*.db-shm
+.env
+release/

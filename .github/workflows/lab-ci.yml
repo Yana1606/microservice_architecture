@@ -1,0 +1,45 @@
+name: Laboratory checks
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Prepare results directory
+        run: mkdir -p test-results
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '8.0.x'
+      - name: Check authored commit history
+        env:
+          # GitHub's temporary PR merge contains the entire diff against main.
+          # Count actual branch commits; build/test still use the checked-out merge.
+          COMMIT_REF: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: python3 scripts/check-commits.py --ref "$COMMIT_REF"
+      - run: dotnet restore MathTournament.sln
+      - run: dotnet build MathTournament.sln --no-restore
+      - run: dotnet test tests/Tests.csproj --no-build --logger "trx;LogFileName=tests.trx" --results-directory test-results
+      - run: dotnet run --project src/TwoPhaseLab/TwoPhaseLab.csproj --no-build
+      - run: docker compose config --quiet
+      - run: docker compose up --build --wait --wait-timeout 180
+      - run: python3 scripts/demo.py ci-tournament
+      - run: python3 scripts/check-http.py ci-tournament
+      - run: python3 scripts/lab-demo.py all
+      - name: Collect Compose logs
+        if: always()
+        run: |
+          mkdir -p test-results
+          docker compose logs > test-results/compose.log 2>&1
+      - name: Stop Compose services
+        if: always()
+        run: docker compose down
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: test-results
+          path: test-results
+          if-no-files-found: ignore

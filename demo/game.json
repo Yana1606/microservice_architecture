@@ -1,0 +1,1 @@
+{"id":"game1","type":"DemoMath","tasks":[{"id":"task1","statement":"Вычислите 2+2","reference":"4","correct":10,"incorrect":0},{"id":"task2","statement":"Вычислите 3×3","reference":"9","correct":10,"incorrect":0}],"modifiers":{"normal":1,"enhanced":1.5,"risk":2},"solutionSeconds":8,"appealSeconds":12}

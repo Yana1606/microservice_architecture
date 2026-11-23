@@ -1,0 +1,77 @@
+name: math-tournament
+x-common: &common
+  build: .
+  restart: unless-stopped
+  environment: &environment
+    ASPNETCORE_URLS: http://+:8080
+    PEER_TOURNAMENT: http://tournament:8080
+    PEER_SCORES: http://scores:8080
+    PEER_RESULTS: http://results:8080
+    PEER_SIMULATOR: http://simulator:8080
+    DB: /data/service.db
+    ENABLE_LAB_DEMOS: "1"
+services:
+  tournament:
+    <<: *common
+    environment:
+      <<: *environment
+      SERVICE: tournament
+    ports: ["127.0.0.1:5101:8080"]
+    volumes: ["tournament:/data"]
+    healthcheck:
+      test: ["CMD", "dotnet", "host/Host.dll", "--healthcheck"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+  scores:
+    <<: *common
+    environment:
+      <<: *environment
+      SERVICE: scores
+    ports: ["127.0.0.1:5102:8080"]
+    volumes: ["scores:/data"]
+    healthcheck:
+      test: ["CMD", "dotnet", "host/Host.dll", "--healthcheck"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+  results:
+    <<: *common
+    environment:
+      <<: *environment
+      SERVICE: results
+    ports: ["127.0.0.1:5103:8080"]
+    volumes: ["results:/data"]
+    healthcheck:
+      test: ["CMD", "dotnet", "host/Host.dll", "--healthcheck"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+  simulator:
+    <<: *common
+    command: ["simulator/Simulator.dll"]
+    environment:
+      <<: *environment
+      SCORES_URL: http://scores:8080
+    ports: ["127.0.0.1:5104:8080"]
+    volumes: ["simulator:/data"]
+    healthcheck:
+      test: ["CMD", "dotnet", "simulator/Simulator.dll", "--healthcheck"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+  tests:
+    image: mcr.microsoft.com/dotnet/sdk:8.0
+    profiles: ["test"]
+    working_dir: /source
+    volumes: [".:/source"]
+    command: ["dotnet", "test", "tests/Tests.csproj", "--logger", "trx", "--results-directory", "test-results"]
+volumes:
+  tournament:
+  scores:
+  results:
+  simulator:
