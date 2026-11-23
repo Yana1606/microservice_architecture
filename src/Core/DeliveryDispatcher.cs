@@ -4,67 +4,153 @@ using System.Text;
 
 namespace MathTournament;
 
-public sealed class DeliveryDispatcher(Store store, HttpClient http, Func<string, string> address, string credential)
+public sealed class DeliveryDispatcher
 {
-    // A failed recipient cannot block another recipient. Durable inboxes tolerate reordering.
-    // Permanent 4xx responses are quarantined so they cannot block later events for this recipient.
-    public async Task DispatchAsync(CancellationToken cancellationToken = default)
+    private readonly IStateStore stateStore;
+    private readonly IOutboxStore outboxStore;
+    private readonly HttpClient http;
+    private readonly Func<string, string> address;
+    private readonly string credential;
+
+    public DeliveryDispatcher(
+        IStateStore stateStore,
+        IOutboxStore outboxStore,
+        HttpClient http,
+        Func<string, string> address,
+        string credential)
     {
-        var paused = store.Read().PausedDestinations;
-        var groups = store.Pending(DateTimeOffset.UtcNow)
-            .Where(d => !paused.Contains(d.Destination))
-            .GroupBy(d => d.Destination);
+        this.stateStore = stateStore
+            ?? throw new ArgumentNullException(nameof(stateStore));
 
-        await Task.WhenAll(groups.Select(async group =>
-        {
-            foreach (var delivery in group)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                try
-                {
-                    using var request = new HttpRequestMessage(HttpMethod.Post,
-                        address(delivery.Destination).TrimEnd('/') + "/internal/events");
-                    request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", credential);
-                    request.Content = new StringContent(Json.Write(delivery.Event), Encoding.UTF8, "application/json");
+        this.outboxStore = outboxStore
+            ?? throw new ArgumentNullException(nameof(outboxStore));
 
-                    using var response = await http.SendAsync(request, cancellationToken);
-                    if (response.IsSuccessStatusCode)
-                    {
-                        store.Delivered(delivery);
-                        continue;
-                    }
+        this.http = http
+            ?? throw new ArgumentNullException(nameof(http));
 
-                    var status = (int)response.StatusCode;
-                    var reason = $"HTTP {status} {response.ReasonPhrase}".Trim();
+        this.address = address
+            ?? throw new ArgumentNullException(nameof(address));
 
-                    if (IsPermanentClientError(response.StatusCode))
-                    {
-                        store.MoveToDeadLetter(delivery, reason);
-
-                        // Do not let a poison message block later events for this destination.
-                        continue;
-                    }
-
-                    // 408, 429, 5xx and unexpected protocol responses are treated as transient.
-                    store.Delivered(delivery, reason);
-                    break;
-                }
-                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-                {
-                    throw;
-                }
-                catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException)
-                {
-                    store.Delivered(delivery, ex.Message);
-
-                    // A transport failure may affect every later message to this recipient.
-                    break;
-                }
-            }
-        }));
+        this.credential = credential
+            ?? throw new ArgumentNullException(nameof(credential));
     }
 
-    private static bool IsPermanentClientError(HttpStatusCode status) =>
-        (int)status is >= 400 and <= 499 && status is not HttpStatusCode.RequestTimeout
-            && (int)status != 429;
+    // Compatibility constructor for existing callers.
+    public DeliveryDispatcher(
+        Store store,
+        HttpClient http,
+        Func<string, string> address,
+        string credential)
+        : this(store, store, http, address, credential)
+    {
+    }
+
+    public async Task DispatchAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var pausedDestinations =
+            stateStore.Read().PausedDestinations;
+
+        var deliveries = outboxStore.Pending(
+            DateTimeOffset.UtcNow);
+
+        var groups = deliveries
+            .Where(delivery =>
+                !pausedDestinations.Contains(delivery.Destination))
+            .GroupBy(delivery => delivery.Destination);
+
+        await Task.WhenAll(
+            groups.Select(async group =>
+            {
+                foreach (var delivery in group)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    try
+                    {
+                        var destination =
+                            address(delivery.Destination).TrimEnd('/');
+
+                        using var request = new HttpRequestMessage(
+                            HttpMethod.Post,
+                            destination + "/internal/events");
+
+                        request.Headers.Authorization =
+                            new AuthenticationHeaderValue(
+                                "Bearer",
+                                credential);
+
+                        request.Content = new StringContent(
+                            Json.Write(delivery.Event),
+                            Encoding.UTF8,
+                            "application/json");
+
+                        using var response = await http.SendAsync(
+                            request,
+                            cancellationToken);
+
+                        if (response.IsSuccessStatusCode)
+                        {
+                            outboxStore.Delivered(delivery);
+                            continue;
+                        }
+
+                        var status = (int)response.StatusCode;
+
+                        var reason =
+                            $"HTTP {status} {response.ReasonPhrase}".Trim();
+
+                        if (IsPermanentClientError(response.StatusCode))
+                        {
+                            outboxStore.MoveToDeadLetter(
+                                delivery,
+                                reason);
+
+                            // Continue with the next event.
+                            continue;
+                        }
+
+                        // Temporary HTTP errors are retried later.
+                        outboxStore.Delivered(
+                            delivery,
+                            reason);
+
+                        // Preserve ordering for this destination.
+                        break;
+                    }
+                    catch (OperationCanceledException)
+                        when (cancellationToken.IsCancellationRequested)
+                    {
+                        throw;
+                    }
+                    catch (HttpRequestException exception)
+                    {
+                        outboxStore.Delivered(
+                            delivery,
+                            exception.Message);
+
+                        break;
+                    }
+                    catch (TaskCanceledException exception)
+                    {
+                        outboxStore.Delivered(
+                            delivery,
+                            exception.Message);
+
+                        break;
+                    }
+                }
+            }));
+    }
+
+    private static bool IsPermanentClientError(
+        HttpStatusCode status)
+    {
+        var code = (int)status;
+
+        return code >= 400 &&
+               code <= 499 &&
+               status != HttpStatusCode.RequestTimeout &&
+               code != 429;
+    }
 }

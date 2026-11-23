@@ -1,24 +1,91 @@
 using Microsoft.Extensions.Caching.Memory;
+
 namespace MathTournament;
-// Both GET and SSE use immutable JSON. Checking the durable version prevents stale refill races.
+
+/// <summary>
+/// Caches immutable public-table JSON while validating
+/// the durable projection revision.
+/// </summary>
 public sealed class TableSnapshotCache : IDisposable
 {
-    private readonly Store store;
+    private const string KeyPrefix = "public-table:";
+
+    private readonly IPublicSnapshotStore snapshots;
     private readonly IMemoryCache cache;
-    private long hits,misses;
     private readonly TimeSpan ttl;
-    private sealed record Entry(long Revision,string Json);
-    public TableSnapshotCache(Store store,IMemoryCache cache):this(store,cache,TimeSpan.FromSeconds(10)){}
-    public TableSnapshotCache(Store store,IMemoryCache cache,TimeSpan ttl)
-    {this.store=store;this.cache=cache;this.ttl=ttl;store.ProjectionCommitted+=Invalidate;}
-    private void Invalidate(IReadOnlyList<string> ids){foreach(var id in ids)cache.Remove("public-table:"+id);}
-    public string Get(string id)
+
+    private long hits;
+    private long misses;
+
+    private sealed record Entry(long Revision, string Json);
+
+    public TableSnapshotCache(
+        IPublicSnapshotStore snapshots,
+        IMemoryCache cache)
+        : this(snapshots, cache, TimeSpan.FromSeconds(10))
     {
-        var key="public-table:"+id;var revision=store.PublicVersion(id);
-        if(cache.TryGetValue<Entry>(key,out var entry)&&entry!.Revision==revision){Interlocked.Increment(ref hits);return entry.Json;}
-        Interlocked.Increment(ref misses);var snapshot=store.PublicSnapshot(id);
-        cache.Set(key,new Entry(snapshot.Revision,snapshot.Json),new MemoryCacheEntryOptions{AbsoluteExpirationRelativeToNow=ttl,Size=1});return snapshot.Json;
     }
-    public object Statistics=>new{hits=Interlocked.Read(ref hits),misses=Interlocked.Read(ref misses),ttlSeconds=ttl.TotalSeconds};
-    public void Dispose()=>store.ProjectionCommitted-=Invalidate;
+
+    public TableSnapshotCache(
+        IPublicSnapshotStore snapshots,
+        IMemoryCache cache,
+        TimeSpan ttl)
+    {
+        this.snapshots = snapshots;
+        this.cache = cache;
+
+        this.ttl = ttl > TimeSpan.Zero
+            ? ttl
+            : throw new ArgumentOutOfRangeException(nameof(ttl));
+
+        snapshots.ProjectionCommitted += Invalidate;
+    }
+
+    private void Invalidate(
+        IReadOnlyList<string> tournamentIds)
+    {
+        foreach (var id in tournamentIds)
+            cache.Remove(KeyPrefix + id);
+    }
+
+    public string Get(string tournamentId)
+    {
+        var key = KeyPrefix + tournamentId;
+
+        // Durable revision check also detects writes from another process.
+        var currentRevision = snapshots.PublicVersion(tournamentId);
+
+        if (cache.TryGetValue<Entry>(key, out var entry) &&
+            entry is not null &&
+            entry.Revision == currentRevision)
+        {
+            Interlocked.Increment(ref hits);
+            return entry.Json;
+        }
+
+        Interlocked.Increment(ref misses);
+
+        var snapshot = snapshots.PublicSnapshot(tournamentId);
+
+        cache.Set(
+            key,
+            new Entry(snapshot.Revision, snapshot.Json),
+            new MemoryCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = ttl,
+                Size = 1
+            });
+
+        return snapshot.Json;
+    }
+
+    public object Statistics => new
+    {
+        hits = Interlocked.Read(ref hits),
+        misses = Interlocked.Read(ref misses),
+        ttlSeconds = ttl.TotalSeconds
+    };
+
+    public void Dispose() =>
+        snapshots.ProjectionCommitted -= Invalidate;
 }
